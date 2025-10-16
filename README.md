@@ -152,6 +152,8 @@ You can think of their roles as complementary:
 
 By combining them, you can build sophisticated, encapsulated, and highly readable event logic.
 
+**Additional Features**: `@doeixd/events` also provides **Handler Operators** for RxJS-style event transformations (debounce, throttle, double-click detection) and **createEvent signals** with automatic async operation abortion for safe concurrent event handling.
+
 ### Bridging the Gap: `toEventDescriptor`
 
 The integration is made possible through a set of **bridge functions**. The most important one is `toEventDescriptor`, which converts any `@doeixd/events` `Handler` chain into a Remix-compatible `EventDescriptor`.
