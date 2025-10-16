@@ -133,15 +133,23 @@ on([button1, button2, button3], 'click', () => {
 
 ## 🔄 Remix Events Integration
 
-The `@doeixd/events` library is designed to work seamlessly with the low-level `@remix-run/events` system. While Remix provides the core mechanism for attaching event listeners via `EventDescriptor` objects, `@doeixd/events` provides a powerful, high-level abstraction for creating reactive and chainable event logic.
+`@doeixd/events` is designed as a powerful companion to the low-level `@remix-run/events` system. The two libraries work together to provide a complete, composable, and reactive event handling solution.
 
-The integration is made possible through a set of **bridge functions** that convert `@doeixd/events` primitives (like `Handler` and `Subject`) into Remix-compatible `EventDescriptor` objects.
+You can think of their roles as complementary:
+-   **`@remix-run/events`** is the **engine**. It provides the core mechanism for attaching event listeners (`events()`) and encapsulating stateful logic into reusable, higher-level **Interactions** (like `press` or `outerPress`). It manages the *lifecycle* of event handling.
+-   **`@doeixd/events`** is the **logic toolkit**. It provides a powerful, declarative API for creating reactive *pipelines* that process the data flowing through those events. It excels at event transformation, conditional logic (`halt()`), and deriving state.
 
-The primary bridge is the `toEventDescriptor` function. It allows you to build complex, type-safe event chains and then "plug them in" to any DOM element managed by Remix.
+By combining them, you can build sophisticated, encapsulated, and highly readable event logic.
 
-### Example: A Validated Form
+### Bridging the Gap: `toEventDescriptor`
 
-Instead of a simple `onClick`, you can build a full validation pipeline. The final business logic will only run if all preceding steps in the chain succeed.
+The integration is made possible through a set of **bridge functions**. The most important one is `toEventDescriptor`, which converts any `@doeixd/events` `Handler` chain into a Remix-compatible `EventDescriptor`.
+
+This allows you to build complex logic with `@doeixd/events` and then seamlessly "plug it in" to any element using Remix's `events()` function or `on` prop.
+
+### Example: A Declarative Validation Pipeline
+
+While Remix provides `dom.submit`, `@doeixd/events` allows you to build a declarative pipeline on top of it. The final business logic will only run if all preceding steps in the chain succeed.
 
 ```typescript
 import { events } from '@remix-run/events';
@@ -149,18 +157,18 @@ import { dom, halt, toEventDescriptor } from '@doeixd/events';
 
 // Assume we have a form element in the DOM
 const formElement = document.querySelector('form')!;
-const emailInput = formElement.querySelector('input[name="email"]') as HTMLInputElement;
+const emailInput = formElement.querySelector('input[name="email"]')!;
 
-// 1. Create a reactive event chain using @doeixd/events DOM utilities.
+// 1. Create a reactive event chain from the DOM event.
 const onSubmit = dom.submit(formElement);
 
-// 2. Chain 1: Prevent the default browser submission.
+// 2. Chain 1: Prevent default browser submission.
 const onSafeSubmit = onSubmit(event => {
   event.preventDefault();
   return event; // Pass the event down the chain
 });
 
-// 3. Chain 2: Validate the email input. If invalid, halt the chain.
+// 3. Chain 2: Validate the email. If invalid, halt the chain.
 const onValidatedSubmit = onSafeSubmit(() => {
   if (emailInput.value.includes('@')) {
     return { email: emailInput.value }; // Pass validated data
@@ -169,15 +177,82 @@ const onValidatedSubmit = onSafeSubmit(() => {
   return halt(); // Stop processing
 });
 
-// 4. Create the final Remix EventDescriptor from our chain.
+// 4. Create the final Remix EventDescriptor from our powerful chain.
 const submitDescriptor = toEventDescriptor(onValidatedSubmit, 'submit');
 
-// 5. Attach the descriptor to the form using Remix's events() function.
+// 5. Attach the descriptor using Remix's events() function.
 const cleanup = events(formElement, [submitDescriptor]);
 
 // Later, when the component unmounts...
 // cleanup();
 ```
+
+### Advanced Use Case: Building Custom Remix Interactions
+
+Remix's custom Interactions are perfect for encapsulating stateful logic. `@doeixd/events` provides an ideal way to write the internal logic for these interactions in a clean, declarative style.
+
+Let's build a `doubleClick` interaction that fires only when a user clicks twice within 300ms.
+
+```typescript
+import { createInteraction } from '@remix-run/events';
+import { createEvent, dom, halt, toEventDescriptor } from '@doeixd/events';
+
+// The Interaction factory
+export const doubleClick = createInteraction('doubleClick', ({ target, dispatch }) => {
+  let timer: number;
+  const [onClick, emitClick] = createEvent<MouseEvent>();
+
+  // 1. Core Logic using @doeixd/events:
+  //    - Start with the raw click events.
+  //    - If a timer is running, it's a double click. Clear the timer and pass the event through.
+  //    - If no timer, start one and halt the chain.
+  const onDoubleClick = onClick(event => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+      return event; // This is a double click!
+    } else {
+      timer = setTimeout(() => (timer = 0), 300);
+      return halt(); // This is the first click.
+    }
+  });
+
+  // 2. Dispatch the custom Remix event when a double click occurs.
+  onDoubleClick(() => dispatch());
+
+  // 3. Bridge the raw DOM click to our internal event emitter.
+  const clickDescriptor = toEventDescriptor(
+    dom.click(target)(e => emitClick(e)),
+    'click'
+  );
+
+  // 4. Attach the listener using Remix's events() and return the cleanup.
+  return events(target, [clickDescriptor]);
+});
+
+// --- How to use it ---
+// Now you have a clean, reusable `doubleClick` interaction.
+const button = document.querySelector('button')!;
+events(button, [
+  doubleClick(() => {
+    console.log('Double click detected!');
+  }),
+]);
+```
+
+This example shows the power of the combination:
+-   **Remix's `createInteraction`** encapsulates the logic and provides the `dispatch` mechanism.
+-   **`@doeixd/events`** provides the declarative tools (`createEvent`, `halt`, chaining) to implement the complex timing logic cleanly.
+
+### Summary of Remix Bridge Functions
+
+| Function                   | Purpose                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------- |
+| `toEventDescriptor`        | Converts a `Handler` chain into a Remix `EventDescriptor`. (Most common)               |
+| `subjectToEventDescriptor` | Creates a descriptor that updates a `Subject` when a custom event is dispatched.     |
+| `emitterToEventDescriptor` | Creates a descriptor that calls an `Emitter` when a custom event is dispatched.      |
+| `bindSubjectToDom`         | Provides two-way binding between a `Subject` and a DOM property for use within Remix. |
+| `bridgeInteractionFactory` | Converts a `Handler` into a factory for creating advanced custom Remix Interactions. |
 
 ## 🎯 Solid-Events Style APIs
 
