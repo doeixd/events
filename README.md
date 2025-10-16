@@ -1076,6 +1076,215 @@ emitNumber(-1); // No log (halted)
 
 Special value used internally for type checking handlers. You typically don't need to use this directly.
 
+### Handler Operators
+
+Handler operators are pipeable functions that transform event handlers, enabling composable, reusable event logic similar to RxJS operators.
+
+<br>
+
+#### `createOperator<T>(process: (data: T, emit: (result: T) => void, halt: () => never) => void): (source: Handler<T>) => Handler<T>`
+
+Helper for creating custom handler operators. Simplifies the boilerplate of operator creation by handling DUMMY values and providing a clean API.
+
+**Parameters:**
+- `process: (data: T, emit: (result: T) => void, halt: () => never) => void` - Function that processes each event
+
+**Process Function Parameters:**
+- `data: T` - The event data
+- `emit: (result: T) => void` - Call to pass data through the chain
+- `halt: () => never` - Call to stop event propagation
+
+**Returns:** Pipeable operator function
+
+**Example:**
+```typescript
+import { createOperator } from '@doeixd/events/operators';
+
+export const take = <T>(count: number) =>
+  createOperator<T>((data, emit, halt) => {
+    if (--count >= 0) {
+      emit(data);
+    } else {
+      halt();
+    }
+  });
+```
+
+<br>
+
+#### `doubleClick<T extends Event>(timeout?: number): (source: Handler<T>) => Handler<T>`
+
+Creates a double-click handler operator that only triggers on double clicks within a timeout.
+
+**Parameters:**
+- `timeout?: number` - Maximum time in milliseconds between clicks (default: 300)
+
+**Returns:** Pipeable operator function
+
+**Example:**
+```typescript
+import { dom } from '@doeixd/events';
+import { doubleClick } from '@doeixd/events/operators';
+
+const onButtonClick = dom.click(button);
+const onButtonDoubleClick = doubleClick(500)(onButtonClick);
+
+onButtonDoubleClick(() => console.log('Double click detected!'));
+```
+
+<br>
+
+#### `debounce<T>(delay: number): (source: Handler<T>) => Handler<T>`
+
+Creates a debounced handler operator that delays execution until after a timeout.
+
+**Parameters:**
+- `delay: number` - Delay in milliseconds
+
+**Returns:** Pipeable operator function
+
+**Example:**
+```typescript
+import { dom } from '@doeixd/events';
+import { debounce } from '@doeixd/events/operators';
+
+const onInput = dom.input(textInput);
+const onDebouncedInput = debounce(300)(onInput);
+
+onDebouncedInput((event) => {
+  console.log('User stopped typing:', event.target.value);
+});
+```
+
+<br>
+
+#### `throttle<T>(interval: number): (source: Handler<T>) => Handler<T>`
+
+Creates a throttled handler operator that limits execution to once per interval.
+
+**Parameters:**
+- `interval: number` - Minimum time in milliseconds between executions
+
+**Returns:** Pipeable operator function
+
+**Example:**
+```typescript
+import { dom } from '@doeixd/events';
+import { throttle } from '@doeixd/events/operators';
+
+const onScroll = dom.scroll(window);
+const onThrottledScroll = throttle(100)(onScroll);
+
+onThrottledScroll(() => {
+  console.log('Scroll event (throttled)');
+});
+```
+
+<br>
+
+#### Creating Custom Handler Operators
+
+Handler operators are functions that take a `Handler<T>` and return a new `Handler<T>`, enabling composable event transformations. Use the `createOperator` helper to simplify operator creation:
+
+```typescript
+import { createOperator } from '@doeixd/events/operators';
+
+export function filter<T>(predicate: (data: T) => boolean) {
+  return createOperator<T>((data, emit, halt) => {
+    if (predicate(data)) {
+      emit(data); // Pass data through
+    } else {
+      halt(); // Stop the event chain
+    }
+  });
+}
+
+// Usage
+import { createEvent } from '@doeixd/events';
+import { filter } from './operators';
+
+const [onNumber, emitNumber] = createEvent<number>();
+const onEvenNumbers = filter((n) => n % 2 === 0)(onNumber);
+
+onEvenNumbers((num) => console.log('Even number:', num));
+
+emitNumber(1); // No output
+emitNumber(2); // Logs: Even number: 2
+emitNumber(3); // No output
+emitNumber(4); // Logs: Even number: 4
+```
+
+**Advanced Example - Custom Debounce with Reset:**
+
+```typescript
+import { createOperator } from '@doeixd/events/operators';
+
+export function debounceWithReset<T>(delay: number, resetValue?: T) {
+  let timeoutId: number | null = null;
+
+  return createOperator<T>((data, emit, halt) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+
+    // Special reset value clears the debounce
+    if (resetValue !== undefined && data === resetValue) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      return; // Don't emit reset values
+    }
+
+    timeoutId = window.setTimeout(() => {
+      timeoutId = null;
+      emit(data);
+    }, delay);
+
+    halt(); // Always halt immediate execution
+  });
+}
+```
+
+**Operator Guidelines:**
+- Use `emit(result)` to pass transformed data through the chain
+- Use `halt()` to stop event propagation (like `preventDefault()`)
+- `createOperator` automatically handles `DUMMY` values for type checking
+- Use closures to maintain state between events
+- Return cleanup functions from operator factories if needed
+
+#### Handler Operators vs Remix Events Interactions
+
+Handler operators and [Remix Events](https://github.com/remix-run/events) "Interactions" serve different but complementary purposes:
+
+**Handler Operators** (this library):
+- Transform single event streams with functional composition
+- Pipeable operators like RxJS: `debounce(300)(throttle(100)(source))`
+- Stateless transformations of individual events
+- Best for: filtering, timing control, data transformation
+
+**Remix Events Interactions**:
+- Stateful compositions of multiple DOM events into behaviors
+- Manage complex state across event types (mouse, keyboard, touch)
+- Encapsulate interaction patterns like "press", "hoverAim", "outerPress"
+- Best for: gesture recognition, multi-event coordination, component interactions
+
+**Example Comparison:**
+
+*Handler Operator* (single event transformation):
+```typescript
+// Debounce a single input event
+const debouncedInput = debounce(300)(dom.input(searchInput));
+```
+
+*Remix Interaction* (multi-event composition):
+```typescript
+// Compose mouse/touch/keyboard into "press" behavior
+const pressHandler = press(() => console.log('Pressed'));
+```
+
+Use handler operators for transforming individual event streams, and Remix Interactions for composing multiple events into higher-level user behaviors.
+
 ### DOM Functions
 
 <br>

@@ -12,12 +12,18 @@ All notable changes to this project will be documented in this file. See [standa
   * `toEmitterEvent()` - Drive EventEmitter instances with reactive logic
   * `adaptEmitter()` - Adapt entire EventEmitter to type-safe reactive interface
   * `EventEmitterLike` interface for Node.js/events compatibility
+* **Handler Operators**: Added pipeable operator functions for composable event logic
+  * `createOperator()` - Helper for creating custom operators
+  * `doubleClick()` - Detect double-clicks within timeout
+  * `debounce()` - Delay execution until after timeout
+  * `throttle()` - Limit execution to once per interval
+  * RxJS-style operator pattern for reusable event transformations
 * **Enhanced createEvent with AbortSignal Support**:
   * Optional AbortSignal parameter for automatic cleanup
   * Meta parameter with AbortSignal for async operation safety
   * Automatic abortion of previous async operations on new emissions
-* **Comprehensive Test Coverage**: Added 8 new tests covering all EventEmitter integration functionality
-* **Documentation Updates**: Enhanced README with EventEmitter integration examples and improved createEvent documentation ([b45dcc9](https://github.com/doeixd/events/commit/b45dcc9411e4e81005b58f5015ab323b045da6ea))
+* **Comprehensive Test Coverage**: Added 8 new tests for EventEmitter integration and 5 new tests for handler operators
+* **Documentation Updates**: Enhanced README with EventEmitter integration examples, handler operators documentation, and improved createEvent documentation ([b45dcc9](https://github.com/doeixd/events/commit/b45dcc9411e4e81005b58f5015ab323b045da6ea))
 
 ### [0.0.9](https://github.com/doeixd/events/compare/v0.0.8...v0.0.9) (2025-10-16)
 

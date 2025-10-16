@@ -6,7 +6,36 @@
  * enabling composable, reusable event logic similar to RxJS operators.
  */
 
-import { halt, Handler } from './main';
+import { halt, Handler, DUMMY } from './main';
+
+/**
+ * Helper for creating custom handler operators.
+ *
+ * @param process Function that processes each event. Call `emit(result)` to pass data through,
+ * or `haltFn()` to stop the event chain.
+ * @returns A pipeable operator function
+ *
+ * @example
+ * ```typescript
+ * import { createOperator } from '@doeixd/events/operators';
+ *
+ * export const filter = <T>(predicate: (data: T) => boolean) =>
+ *   createOperator<T>((data, emit, halt) => {
+ *     if (predicate(data)) emit(data);
+ *     else halt();
+ *   });
+ * ```
+ */
+export function createOperator<T>(
+  process: (data: T, emit: (result: T) => void, haltFn: () => never) => void
+) {
+  return (source: Handler<T>): Handler<T> =>
+    (callback) => source((data) => {
+      if (data === DUMMY) return callback(data);
+
+      process(data, callback, halt);
+    });
+}
 
 /**
  * Creates a double-click handler operator that only triggers on double clicks within a timeout.
@@ -28,16 +57,16 @@ import { halt, Handler } from './main';
 export function doubleClick<T extends Event>(timeout = 300) {
   let timer: number = 0;
 
-  return (source: Handler<T>): Handler<T> =>
-    source(event => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = 0;
-        return event; // Pass through on double click
-      }
+  return createOperator<T>((event, emit, halt) => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = 0;
+      emit(event); // Pass through on double click
+    } else {
       timer = window.setTimeout(() => (timer = 0), timeout);
-      return halt(); // Halt on first click
-    });
+      halt(); // Halt on first click
+    }
+  });
 }
 
 /**
@@ -62,18 +91,16 @@ export function doubleClick<T extends Event>(timeout = 300) {
 export function debounce<T>(delay: number) {
   let timeoutId: number | null = null;
 
-  return (source: Handler<T>): Handler<T> =>
-    source(data => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      timeoutId = window.setTimeout(() => {
-        timeoutId = null;
-        // Re-emit the data after the delay
-        source(() => data);
-      }, delay);
-      return halt(); // Always halt - we'll re-emit manually
-    });
+  return createOperator<T>((data, emit, halt) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = window.setTimeout(() => {
+      timeoutId = null;
+      emit(data);
+    }, delay);
+    halt(); // Halt immediate execution
+  });
 }
 
 /**
@@ -98,13 +125,13 @@ export function debounce<T>(delay: number) {
 export function throttle<T>(interval: number) {
   let lastExecution = 0;
 
-  return (source: Handler<T>): Handler<T> =>
-    source(data => {
-      const now = Date.now();
-      if (now - lastExecution >= interval) {
-        lastExecution = now;
-        return data; // Pass through
-      }
-      return halt(); // Throttle - don't pass through
-    });
+  return createOperator<T>((data, emit, halt) => {
+    const now = Date.now();
+    if (now - lastExecution >= interval) {
+      lastExecution = now;
+      emit(data); // Pass through
+    } else {
+      halt(); // Throttle - don't pass through
+    }
+  });
 }

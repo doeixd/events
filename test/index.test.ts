@@ -1434,11 +1434,15 @@ describe('DOM Utilities', () => {
 
         // First click - should not trigger
         emitEvent(new MouseEvent('click'));
-        expect(mockCallback).not.toHaveBeenCalled();
+        // Filter out DUMMY calls and check actual calls
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(0);
 
         // Second click within timeout - should trigger
         emitEvent(new MouseEvent('click'));
-        expect(mockCallback).toHaveBeenCalledWith(new MouseEvent('click'));
+        const actualCallsAfter = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCallsAfter).toHaveLength(1);
+        expect(actualCallsAfter[0][0]).toBeInstanceOf(MouseEvent);
       });
 
       it('should not trigger if clicks are too far apart', async () => {
@@ -1450,14 +1454,16 @@ describe('DOM Utilities', () => {
 
         // First click
         emitEvent(new MouseEvent('click'));
-        expect(mockCallback).not.toHaveBeenCalled();
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(0);
 
         // Wait longer than timeout
         await new Promise(resolve => setTimeout(resolve, 100));
 
         // Second click - should not trigger
         emitEvent(new MouseEvent('click'));
-        expect(mockCallback).not.toHaveBeenCalled();
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(0);
       });
     });
 
@@ -1474,15 +1480,17 @@ describe('DOM Utilities', () => {
         emitEvent('second');
         emitEvent('third');
 
-        // Should not have triggered yet
-        expect(mockCallback).not.toHaveBeenCalled();
+        // Should not have triggered yet (only DUMMY call)
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(0);
 
         // Wait for debounce timeout
         await new Promise(resolve => setTimeout(resolve, 150));
 
         // Should have triggered with the last value
-        expect(mockCallback).toHaveBeenCalledWith('third');
-        expect(mockCallback).toHaveBeenCalledTimes(1);
+        const actualCallsAfter = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCallsAfter).toHaveLength(1);
+        expect(actualCallsAfter[0][0]).toBe('third');
       });
 
       it('should reset timeout on new events', async () => {
@@ -1501,8 +1509,9 @@ describe('DOM Utilities', () => {
         emitEvent('third'); // Reset timer again
         await new Promise(resolve => setTimeout(resolve, 120));
 
-        expect(mockCallback).toHaveBeenCalledWith('third');
-        expect(mockCallback).toHaveBeenCalledTimes(1);
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe('third');
       });
     });
 
@@ -1516,21 +1525,24 @@ describe('DOM Utilities', () => {
 
         // First event should trigger
         emitEvent('first');
-        expect(mockCallback).toHaveBeenCalledWith('first');
-        expect(mockCallback).toHaveBeenCalledTimes(1);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe('first');
 
         // Events within interval should be throttled
         emitEvent('second');
         emitEvent('third');
-        expect(mockCallback).toHaveBeenCalledTimes(1);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
 
         // Wait for interval to pass
         await new Promise(resolve => setTimeout(resolve, 110));
 
         // Next event should trigger
         emitEvent('fourth');
-        expect(mockCallback).toHaveBeenCalledWith('fourth');
-        expect(mockCallback).toHaveBeenCalledTimes(2);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[1][0]).toBe('fourth');
       });
     });
   });
