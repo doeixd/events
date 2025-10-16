@@ -43,6 +43,7 @@
   },
   "private": false,
   "description": "A powerful, type-safe reactive event system for TypeScript/JavaScript applications",
+  "license": "MIT",
   "repository": {
     "url": "https://github.com/doeixd/events",
     "type": "git"
