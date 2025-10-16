@@ -61,6 +61,13 @@ onFinalMessage(message => console.log(message));
 
 emitIncrement(-1); // No output (halted)
 emitIncrement(5);  // logs "Valid increment: 5"
+
+// Reactive subjects
+const count = createSubject(0);
+count.subscribe((value) => console.log('Count is now:', value));
+
+count(1); // logs "Count is now: 1"
+console.log(count()); // 1
 ```
 
 <br />
@@ -70,7 +77,7 @@ emitIncrement(5);  // logs "Valid increment: 5"
 ### Event System
 
 ```typescript
-import { createEvent, halt } from 'events';
+import { createEvent, halt } from '@doeixd/events';
 
 // Create typed events
 const [onMessage, emitMessage] = createEvent<string>();
@@ -196,7 +203,7 @@ Remix's custom Interactions are perfect for encapsulating stateful logic. `@doei
 Let's build a `doubleClick` interaction that fires only when a user clicks twice within 300ms.
 
 ```typescript
-import { createInteraction } from '@remix-run/events';
+import { createInteraction, events } from '@remix-run/events';
 import { createEvent, dom, halt, toEventDescriptor } from '@doeixd/events';
 
 // The Interaction factory
@@ -258,7 +265,7 @@ This example shows the power of the combination:
 
 <br />
 
-## Inspired by Solid-Events
+## Declarative APIs Inspired by Solid-Events
 
 The core architecture and API of `@doeixd/events` are heavily inspired by the excellent [`solid-events`](https://github.com/solidjs-community/solid-events) library. The goal is to take the powerful, declarative patterns for event composition and state derivation and make them available in a **framework-agnostic** package that can be used in any JavaScript environment.
 
