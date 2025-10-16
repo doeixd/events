@@ -14,48 +14,50 @@ jobs:
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0 # This is important for getting all tags
-       - name: Setup Node.js
-         uses: actions/setup-node@v3
-         with:
-           node-version: "16"
-           registry-url: "https://registry.npmjs.org"
 
-       - name: Install dependencies
-         run: npm ci
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+          registry-url: "https://registry.npmjs.org"
 
-       - name: Build all packages
-         run: npm run build:all
+      - name: Install dependencies
+        run: npm ci
 
-       - name: Find built files (main package)
-         id: find_files
-         run: |
-           CJS_FILE=$(find dist -name "*.cjs.js" -or -name "index.js" -or -name "index.jsx" | grep "/cjs/" | head -n 1)
-           ESM_FILE=$(find dist -name "*.esm.js" -or -name "index.js" -or -name "index.jsx" | grep "/esm/" | head -n 1)
-           TYPES_FILE=$(find dist -name "index.d.ts" | head -n 1)
+      - name: Build all packages
+        run: npm run build:all
 
-           echo "CJS file: $CJS_FILE"
-           echo "ESM file: $ESM_FILE"
-           echo "Types file: $TYPES_FILE"
+      - name: Find built files (main package)
+        id: find_files
+        run: |
+          CJS_FILE=$(find dist -name "*.cjs.js" -or -name "index.js" -or -name "index.jsx" | grep "/cjs/" | head -n 1)
+          ESM_FILE=$(find dist -name "*.esm.js" -or -name "index.js" -or -name "index.jsx" | grep "/esm/" | head -n 1)
+          TYPES_FILE=$(find dist -name "index.d.ts" | head -n 1)
 
-           echo "cjs_file=$CJS_FILE" >> $GITHUB_OUTPUT
-           echo "esm_file=$ESM_FILE" >> $GITHUB_OUTPUT
-           echo "types_file=$TYPES_FILE" >> $GITHUB_OUTPUT
+          echo "CJS file: $CJS_FILE"
+          echo "ESM file: $ESM_FILE"
+          echo "Types file: $TYPES_FILE"
 
-       - name: Publish main package to npm
-         run: npm publish
-         env:
-           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          echo "cjs_file=$CJS_FILE" >> $GITHUB_OUTPUT
+          echo "esm_file=$ESM_FILE" >> $GITHUB_OUTPUT
+          echo "types_file=$TYPES_FILE" >> $GITHUB_OUTPUT
 
-       - name: Publish React package to npm
-         run: |
-           cd packages/react
-           npm publish
-         env:
-           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-         continue-on-error: true
+      - name: Publish main package to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish React package to npm
+        run: |
+          cd packages/react
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
 
       - name: Get Changelog Entry
         id: get_changelog
