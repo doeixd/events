@@ -1143,4 +1143,4 @@ Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive progr
 
 <br />
 
-Made with ❤️ for the reactive programming community
+
