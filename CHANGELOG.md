@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.11](https://github.com/doeixd/events/compare/v0.0.10...v0.0.11) (2025-10-16)
+
+
+### Features
+
+* add handler operators (doubleClick, debounce, throttle) ([6b6792a](https://github.com/doeixd/events/commit/6b6792aa626315a81cd279009329ff993bafa848))
+* **operators:** add createOperator helper for easier custom operator creation ([40085cb](https://github.com/doeixd/events/commit/40085cb92881d2b43926a2553808d5cf96d6a613))
+
 ### [0.0.10](https://github.com/doeixd/events/compare/v0.0.9...v0.0.10) (2025-10-16)
 
 
