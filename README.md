@@ -1,7 +1,7 @@
-# @doeixd/events
-
 [![npm version](https://badge.fury.io/js/%40doeixd%2Fevents.svg)](https://badge.fury.io/js/%40doeixd%2Fevents)
 [![GitHub](https://img.shields.io/github/stars/doeixd/events)](https://github.com/doeixd/events)
+
+# @doeixd/events
 
 A powerful, type-safe reactive event system for TypeScript/JavaScript applications. Inspired by solid-events and remix events, this library provides SolidJS-style primitives, DOM utilities, and seamless Remix integration for building reactive user interfaces and event-driven architectures.
 
