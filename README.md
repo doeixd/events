@@ -30,47 +30,6 @@ yarn add @doeixd/events
 pnpm add @doeixd/events
 ```
 
-## 🎯 Framework Integrations
-
-### React Hooks (`@doeixd/react`)
-
-For seamless React integration with automatic subscription lifecycle management:
-
-```bash
-npm install @doeixd/react
-```
-
-```tsx
-import { useEvent, useSubject, useSubjectSelector } from '@doeixd/react';
-import { createEvent, createSubject } from '@doeixd/events';
-
-function Counter() {
-  const [onIncrement, emitIncrement] = createEvent<number>();
-  const count = createSubject(0);
-
-  useEvent(onIncrement, delta => count(count() + delta));
-  const currentCount = useSubject(count);
-
-  return <button onClick={() => emitIncrement(1)}>Count: {currentCount}</button>;
-}
-```
-
-### Performance Optimizations
-
-Enable batched updates to prevent redundant computations in complex reactive graphs:
-
-```typescript
-import { createSubject, batch } from '@doeixd/events';
-
-// Per-subject batching (batches individual updates)
-const user = createSubject(null, { batch: true });
-
-// Manual batching (batch multiple operations)
-batch(() => {
-  firstName('John');
-  lastName('Doe'); // All notifications happen once at end
-});
-```
 
 <br />
 
@@ -387,6 +346,52 @@ While the core API is parallel, `@doeixd/events` differs in a few crucial ways t
 
 3.  **Expanded Focus on DOM and Integrations**:
     *   `@doeixd/events` includes a rich set of **DOM Utilities** and a dedicated **Remix Integration Bridge** to provide a first-class experience in a variety of frontend environments.
+
+<br />
+
+## 🎯 Framework Integrations
+
+### React Hooks (`@doeixd/react`)
+
+For seamless React integration with automatic subscription lifecycle management:
+
+```bash
+npm install @doeixd/react
+```
+
+```tsx
+import { useEvent, useSubject, useSubjectSelector } from '@doeixd/react';
+import { createEvent, createSubject } from '@doeixd/events';
+
+function Counter() {
+  const [onIncrement, emitIncrement] = createEvent<number>();
+  const count = createSubject(0);
+
+  useEvent(onIncrement, delta => count(count() + delta));
+  const currentCount = useSubject(count);
+
+  return <button onClick={() => emitIncrement(1)}>Count: {currentCount}</button>;
+}
+```
+
+### Performance Optimizations
+
+Enable batched updates to prevent redundant computations in complex reactive graphs:
+
+```typescript
+import { createSubject, batch } from '@doeixd/events';
+
+// Per-subject batching (batches individual updates)
+const user = createSubject(null, { batch: true });
+
+// Manual batching (batch multiple operations)
+batch(() => {
+  firstName('John');
+  lastName('Doe'); // All notifications happen once at end
+});
+```
+
+<br />
 
 ## 🔒 Type Safety
 
