@@ -131,6 +131,8 @@ on([button1, button2, button3], 'click', () => {
 });
 ```
 
+<br />
+
 ## 🔄 Remix Events Integration
 
 `@doeixd/events` is designed as a powerful companion to the low-level `@remix-run/events` system. The two libraries work together to provide a complete, composable, and reactive event handling solution.
@@ -254,53 +256,88 @@ This example shows the power of the combination:
 | `bindSubjectToDom`         | Provides two-way binding between a `Subject` and a DOM property for use within Remix. |
 | `bridgeInteractionFactory` | Converts a `Handler` into a factory for creating advanced custom Remix Interactions. |
 
-## 🎯 Solid-Events Style APIs
+<br />
 
-Familiar patterns for SolidJS developers.
+## Inspired by Solid-Events
+
+The core architecture and API of `@doeixd/events` are heavily inspired by the excellent [`solid-events`](https://github.com/solidjs-community/solid-events) library. The goal is to take the powerful, declarative patterns for event composition and state derivation and make them available in a **framework-agnostic** package that can be used in any JavaScript environment.
+
+If you are familiar with `solid-events`, you will find the API to be almost identical, enabling you to build complex, predictable logic by defining how state reacts to events.
+
+### Derive State from Events (`createSubject`)
+Create a reactive subject whose value is managed exclusively by event handlers. This makes state changes traceable and predictable.
 
 ```typescript
-import {
-  createSubject,
-  createAsyncSubject,
-  createSubjectStore,
-  createTopic,
-  createPartition
-} from '@doeixd/events';
-
-// Reactive subject with event handlers
-const [onIncrement, emitIncrement] = createEvent();
+const [onIncrement, emitIncrement] = createEvent<number>();
 const [onReset, emitReset] = createEvent();
 
 const count = createSubject(0,
   onIncrement(delta => currentCount => currentCount + delta),
   onReset(() => 0)
 );
+```
 
-// Async subject
-const userData = createAsyncSubject(
-  () => fetchUser(),     // Initial async load
-  onUpdate(user => updatedUser => ({ ...updatedUser, ...user }))
-);
+### Manage Async Data (`createAsyncSubject`)
+Create a subject that loads its initial state from an async source and can be updated or re-fetched via events.
 
-// Mutable store (like SolidJS stores)
-const boardStore = createSubjectStore(initialBoard,
-  onAddNote(note => board => {
-    board.notes.push(note);
-  })
-);
-
-// Event composition
-const onAnyChange = createTopic(
-  onIncrement(delta => `incremented by ${delta}`),
-  onReset(() => 'reset')
-);
-
-// Conditional splitting
-const [onValid, onInvalid] = createPartition(
-  onIncrement,
-  (delta) => delta > 0
+```typescript
+const [onRefresh, emitRefresh] = createEvent();
+const user = createAsyncSubject(
+  () => fetch('/api/user').then(res => res.json()), // Initial load
+  onRefresh(() => fetch('/api/user').then(res => res.json())) // Re-fetch
 );
 ```
+
+### Mutate State Directly (`createSubjectStore`)
+Create a mutable store (like Immer or Solid stores) where event handlers can safely and directly mutate the state object.
+
+```typescript
+const [onAddItem, emitAddItem] = createEvent<string>();
+const cart = createSubjectStore({ items: [] },
+  onAddItem(item => state => {
+    state.items.push(item); // Directly mutate state
+  })
+);
+```
+
+### Merge Events (`createTopic`)
+Combine multiple, distinct event streams into a single, unified handler.
+
+```typescript
+const [onLogin, emitLogin] = createEvent<string>();
+const [onLogout, emitLogout] = createEvent();
+
+const onAuthChange = createTopic(
+  onLogin(user => `User logged in: ${user}`),
+  onLogout(() => 'User logged out')
+);
+```
+
+### Split Events (`createPartition`)
+Split a single event stream into two separate streams based on a predicate function.
+
+```typescript
+const [onNumber, emitNumber] = createEvent<number>();
+
+const [onPositive, onNegativeOrZero] = createPartition(
+  onNumber,
+  (num) => num > 0
+);
+```
+
+### Key Differences from `solid-events`
+While the core API is parallel, `@doeixd/events` differs in a few crucial ways to achieve its framework-agnostic goals:
+
+1.  **Framework Agnostic vs. SolidJS-Specific**:
+    *   `solid-events` is designed specifically for **SolidJS** and integrates deeply with its reactive graph.
+    *   `@doeixd/events` is built with **no framework dependencies**, allowing it to be used anywhere.
+
+2.  **Memory Management**:
+    *   In `solid-events`, handlers are **automatically cleaned up** by Solid's component lifecycle.
+    *   `@doeixd/events` requires **manual cleanup**. You must call the `unsubscribe` function returned by a handler or use an `AbortSignal` to prevent memory leaks, especially within component lifecycles (e.g., in React's `useEffect` cleanup).
+
+3.  **Expanded Focus on DOM and Integrations**:
+    *   `@doeixd/events` includes a rich set of **DOM Utilities** and a dedicated **Remix Integration Bridge** to provide a first-class experience in a variety of frontend environments.
 
 ## 🔒 Type Safety
 
@@ -1211,117 +1248,6 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `subjectFromEvent` as `subjectFromDomEvent`
 - `subjectProperty` as `subjectDomProperty`
 - `createSubject` as `createSubjectSolid`
-
-<br />
-
-
-<br />
-
-## 🔄 Seamless Integration with Remix Events
-
-The `@doeixd/events` library is designed to work seamlessly with the low-level `@remix-run/events` system. While Remix provides the core mechanism for attaching event listeners via `EventDescriptor` objects, `@doeixd/events` provides a powerful, high-level abstraction for creating reactive and chainable event logic.
-
-The integration is made possible through a set of **bridge functions** that convert `@doeixd/events` primitives (like `Handler`, `Subject`, and `Emitter`) into Remix-compatible `EventDescriptor` objects.
-
-### The Core Concept: `toEventDescriptor`
-
-The primary bridge is the `toEventDescriptor` function. It takes a `@doeixd/events` `Handler` and an event type string, and returns an `EventDescriptor` that you can pass directly to Remix's `events()` function.
-
-This allows you to build complex, type-safe event chains and then "plug them in" to any DOM element managed by Remix.
-
-### Practical Example: A Validated Form
-
-Imagine you want to handle a form submission. With `@doeixd/events`, you can create a clean pipeline to prevent the default behavior, extract data, and validate it, all before your final logic runs.
-
-```typescript
-import { events } from '@remix-run/events';
-import { dom, halt, toEventDescriptor } from '@doeixd/events';
-
-// Assume we have a form element in the DOM
-const formElement = document.querySelector('form')!;
-const emailInput = formElement.querySelector('input[name="email"]') as HTMLInputElement;
-
-// 1. Create a reactive event chain using @doeixd/events DOM utilities.
-//    This handler listens for 'submit' events on the form.
-const onSubmit = dom.submit(formElement);
-
-// 2. Chain 1: Prevent the default browser submission and stop bubbling.
-const onSafeSubmit = onSubmit(event => {
-  event.preventDefault();
-  event.stopPropagation();
-  return event; // Pass the event down the chain
-});
-
-// 3. Chain 2: Validate the email input. If invalid, halt the chain.
-const onValidatedSubmit = onSafeSubmit(() => {
-  if (emailInput.value.includes('@')) {
-    return { email: emailInput.value }; // Pass validated data
-  }
-  console.log('Validation failed!');
-  return halt(); // Stop processing
-});
-
-// 4. Create the final Remix EventDescriptor from our chain.
-//    The type 'submit' MUST match the original DOM event.
-const submitDescriptor = toEventDescriptor(onValidatedSubmit, 'submit');
-
-// 5. Attach the descriptor to the form using Remix's events() function.
-const cleanup = events(formElement, [
-  submitDescriptor,
-
-  // You can still use standard Remix descriptors alongside it
-  dom.click(() => console.log('Form was clicked (handled by Remix dom.click)'))
-]);
-
-// Later, when the component unmounts...
-// cleanup();
-```
-
-In this example, the `onValidatedSubmit` handler will only receive an event if all the preceding steps in the chain (prevention, validation) are successful. This keeps your final business logic clean and focused.
-
-### Bridging Subjects with `subjectToEventDescriptor`
-
-You can also bridge a `Subject` to listen for custom events, allowing external events to update your reactive state.
-
-```typescript
-import { events } from '@remix-run/events';
-import { createSubject, subjectToEventDescriptor } from '@doeixd/events';
-
-// A subject to hold the current notification message
-const notification = createSubject<string | null>(null);
-notification.subscribe(message => {
-  if (message) {
-    console.log(`Displaying notification: ${message}`);
-  }
-});
-
-// Create a descriptor that listens for a custom 'show-notification' event.
-// When this event is dispatched on `window`, it will update the `notification` subject
-// with the event's `detail` payload.
-const notificationDescriptor = subjectToEventDescriptor(
-  notification,
-  'show-notification'
-);
-
-// Attach the listener to the window object
-events(window, [notificationDescriptor]);
-
-// Now, anywhere in your app, you can dispatch this custom event
-window.dispatchEvent(
-  new CustomEvent('show-notification', { detail: 'Your data has been saved!' })
-);
-// Logs: "Displaying notification: Your data has been saved!"
-```
-
-### Summary of Remix Bridge Functions
-
-| Function                  | Purpose                                                                                   |
-| ------------------------- | ----------------------------------------------------------------------------------------- |
-| `toEventDescriptor`       | Converts a `Handler` chain into a Remix `EventDescriptor`. (Most common)                  |
-| `subjectToEventDescriptor`  | Creates a descriptor that updates a `Subject` when a custom event is dispatched.        |
-| `emitterToEventDescriptor`  | Creates a descriptor that calls an `Emitter` when a custom event is dispatched.         |
-| `bindSubjectToDom`        | Provides a two-way binding between a `Subject` and a DOM property for use within Remix.   |
-| `bridgeInteractionFactory`| Converts a `Handler` into a factory for creating advanced custom Remix Interactions.    |
 
 
 <br />
