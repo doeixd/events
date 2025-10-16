@@ -479,37 +479,403 @@ function usePosts() {
 }
 ```
 
-## 🏗️ API Reference
+## 🏗️ Complete API Reference
+
+### Core Types
+
+```typescript
+// Function to emit events with data of type T
+type Emitter<T> = (data?: T) => void;
+
+// Higher-order function for handling events
+type Handler<T> = <R>(
+  cb: (data: T) => R | Promise<R> | void | Promise<void>
+) => R extends void | Promise<void> ? Unsubscribe : Handler<Awaited<R>>;
+
+// Unsubscribe function returned by handlers
+type Unsubscribe = () => void;
+
+// Reactive subject interface
+interface Subject<S> {
+  (value?: S): S;
+  subscribe(cb: (value: S) => void): Unsubscribe;
+  dispose?: () => void;
+}
+```
 
 ### Core Functions
 
-- `createEvent<T>(defaultValue?)`: Creates a typed event system returning `[handler, emit]`
-- `createSubject<T>(initial?, ...handlers)`: Creates a reactive subject with automatic updates
-- `halt()`: Throws to halt event chain execution (TypeScript infers `never`)
-- `DUMMY`: Special value used internally for type checking handlers
+#### `createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [Handler<T>, Emitter<T>]`
+
+Creates a typed event system with a handler and emitter.
+
+**Parameters:**
+- `defaultValue?: T` - Optional default value to emit when no data is provided
+- `options.signal?: AbortSignal` - Optional abort signal for automatic cleanup
+
+**Returns:** Tuple of `[handler, emitter]`
+
+**Example:**
+```typescript
+const [onMessage, emitMessage] = createEvent<string>();
+
+onMessage((msg) => console.log('Received:', msg));
+emitMessage('Hello World!'); // Logs: Received: Hello World!
+```
+
+#### `createSubject<T>(initial?: T): Subject<T>`
+
+Creates a reactive subject that holds a value and notifies subscribers.
+
+**Parameters:**
+- `initial?: T` - Initial value for the subject
+
+**Returns:** Subject instance
+
+**Example:**
+```typescript
+const count = createSubject(0);
+count.subscribe((value) => console.log('Count:', value));
+
+count(5); // Logs: Count: 5
+console.log(count()); // 5
+```
+
+#### `createSubject<T>(initial: T | (() => T), ...handlers: Handler<any>[]): Subject<T>` (SolidJS-style)
+
+Creates a reactive subject derived from event handlers (SolidJS-style).
+
+**Parameters:**
+- `initial: T | (() => T)` - Initial value or function returning initial value
+- `handlers: Handler<any>[]` - Event handlers that update the subject
+
+**Returns:** Subject instance
+
+**Example:**
+```typescript
+const [onIncrement, emitIncrement] = createEvent<number>();
+const count = createSubject(0, onIncrement((delta) => (current) => current + delta));
+
+emitIncrement(5);
+console.log(count()); // 5
+```
+
+#### `halt(): never`
+
+Halts the current event chain execution without throwing an error.
+
+**Returns:** Never (throws internal symbol)
+
+**Example:**
+```typescript
+const [onNumber, emitNumber] = createEvent<number>();
+
+onNumber((n) => {
+  if (n < 0) halt(); // Stop processing
+  console.log('Processing:', n);
+});
+
+emitNumber(5);  // Logs: Processing: 5
+emitNumber(-1); // No log (halted)
+```
+
+#### `DUMMY: string`
+
+Special value used internally for type checking handlers. You typically don't need to use this directly.
 
 ### DOM Functions
 
-- `fromDomEvent(element, eventName, options?)`: Creates typed DOM event handler with AbortSignal support
-- `dom`: Object with shortcuts for common DOM events (`click`, `input`, `submit`, etc.)
-- `subjectProperty(element, property, event?)`: Reactive DOM property binding with auto-updates
-- `subjectFromEvent(element, eventName)`: Converts DOM event stream to reactive subject
-- `on(elements, event, handler, options?)`: Multi-element event handling with cleanup
+#### `fromDomEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }): Handler<HTMLElementEventMap[K]>`
 
-### Remix Bridge
+Creates a type-safe DOM event handler with AbortSignal support.
 
-- `toEventDescriptor(handler, type, signal?)`: Converts Handler to Remix EventDescriptor
-- `subjectToEventDescriptor(subject, type, signal?)`: Converts Subject to EventDescriptor
-- `fromDomHandler(element, eventName, options?)`: DOM handler creation for Remix
-- `bindSubjectToDom(subject, element, propOrEvent, opts?)`: Bidirectional DOM-subject binding
+**Parameters:**
+- `el: E` - DOM element to attach the event to
+- `eventName: K` - Event name (e.g., 'click', 'input')
+- `options.signal?: AbortSignal` - Optional abort signal for cleanup
+- `options.capture?: boolean` - Use capture phase
+- `options.passive?: boolean` - Passive listener
 
-### SolidJS-Style Helpers
+**Returns:** Handler for the DOM event
 
-- `createAsyncSubject(asyncSource, ...handlers)`: Async reactive subject with promise flattening
-- `createSubjectStore(initial, ...handlers)`: Mutable state store (like SolidJS stores)
-- `createTopic(...handlers)`: Merges multiple event handlers into one
-- `createPartition(source, predicate)`: Splits handler based on condition
-- `combineLatest(...handlers)`: Combines latest values from multiple handlers
+**Example:**
+```typescript
+const button = document.querySelector('button')!;
+const clickHandler = fromDomEvent(button, 'click');
+
+clickHandler(() => console.log('Clicked!'));
+```
+
+#### `dom`
+
+Object containing shortcuts for common DOM events.
+
+**Available shortcuts:**
+- `dom.click<E extends Element>(el: E, options?)`
+- `dom.dblclick<E extends Element>(el: E, options?)`
+- `dom.input<E extends HTMLInputElement | HTMLTextAreaElement>(el: E, options?)`
+- `dom.change<E extends HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(el: E, options?)`
+- `dom.submit<E extends HTMLFormElement>(el: E, options?)`
+- `dom.keydown<E extends Element>(el: E, options?)`
+- `dom.keyup<E extends Element>(el: E, options?)`
+- `dom.focus<E extends Element>(el: E, options?)`
+- `dom.blur<E extends Element>(el: E, options?)`
+- `dom.mousemove<E extends Element>(el: E, options?)`
+- `dom.mousedown<E extends Element>(el: E, options?)`
+- `dom.mouseup<E extends Element>(el: E, options?)`
+- `dom.wheel<E extends Element>(el: E, options?)`
+- `dom.touchstart<E extends Element>(el: E, options?)`
+- `dom.touchend<E extends Element>(el: E, options?)`
+- `dom.touchmove<E extends Element>(el: E, options?)`
+
+**Example:**
+```typescript
+const button = document.querySelector('button')!;
+const clickHandler = dom.click(button);
+
+clickHandler(() => console.log('Button clicked!'));
+```
+
+#### `subjectProperty<T extends Element, K extends keyof T>(el: T, prop: K, eventName?: keyof HTMLElementEventMap): Subject<T[K]>`
+
+Creates a reactive Subject bound to a DOM element property.
+
+**Parameters:**
+- `el: T` - DOM element
+- `prop: K` - Property name to bind to
+- `eventName?: keyof HTMLElementEventMap` - Event that triggers updates (default: 'input')
+
+**Returns:** Subject bound to the property
+
+**Example:**
+```typescript
+const input = document.querySelector('input')!;
+const value = subjectProperty(input, 'value');
+
+value.subscribe((val) => console.log('Input value:', val));
+```
+
+#### `subjectFromEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K): Subject<HTMLElementEventMap[K]>`
+
+Converts a DOM event stream into a reactive Subject.
+
+**Parameters:**
+- `el: E` - DOM element
+- `eventName: K` - Event name
+
+**Returns:** Subject that emits DOM events
+
+**Example:**
+```typescript
+const button = document.querySelector('button')!;
+const clicks = subjectFromEvent(button, 'click');
+
+clicks.subscribe((event) => console.log('Button clicked at:', event.clientX, event.clientY));
+```
+
+#### `on<E extends Element>(elements: E[] | NodeListOf<E>, event: keyof HTMLElementEventMap, handler: (ev: HTMLElementEventMap[typeof event]) => void, options?: { signal?: AbortSignal }): Unsubscribe`
+
+Attaches an event handler to multiple elements.
+
+**Parameters:**
+- `elements: E[] | NodeListOf<E>` - Elements to attach to
+- `event: keyof HTMLElementEventMap` - Event name
+- `handler: (ev: HTMLElementEventMap[typeof event]) => void` - Event handler
+- `options.signal?: AbortSignal` - Optional abort signal
+
+**Returns:** Unsubscribe function
+
+**Example:**
+```typescript
+const buttons = document.querySelectorAll('.my-button');
+const unsub = on(buttons, 'click', (event) => {
+  console.log('Button clicked:', event.target);
+});
+```
+
+### Remix Bridge Functions
+
+#### `toEventDescriptor<T>(handler: Handler<T>, type: string, signal?: AbortSignal): EventDescriptor`
+
+Converts a Handler to a Remix EventDescriptor.
+
+**Parameters:**
+- `handler: Handler<T>` - Handler to convert
+- `type: string` - Event type string
+- `signal?: AbortSignal` - Optional abort signal
+
+**Returns:** Remix EventDescriptor
+
+**Example:**
+```typescript
+const [onEvent, emitEvent] = createEvent<string>();
+const descriptor = toEventDescriptor(onEvent, 'custom-event');
+
+// Use in Remix events()
+events(button, [descriptor]);
+```
+
+#### `subjectToEventDescriptor<T>(subject: Subject<T>, type: string, signal?: AbortSignal): EventDescriptor`
+
+Converts a Subject to a Remix EventDescriptor.
+
+**Parameters:**
+- `subject: Subject<T>` - Subject to convert
+- `type: string` - Event type string
+- `signal?: AbortSignal` - Optional abort signal
+
+**Returns:** Remix EventDescriptor
+
+#### `fromDomHandler<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, opts?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }): Handler<HTMLElementEventMap[K]>`
+
+Creates a DOM handler for Remix integration.
+
+**Parameters:**
+- `el: E` - DOM element
+- `eventName: K` - Event name
+- `opts?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }` - Options
+
+**Returns:** Handler for DOM events
+
+#### `bindSubjectToDom<E extends Element, K extends keyof E>(subject: Subject<any>, el: E, propOrEvent: K | keyof HTMLElementEventMap, opts?: { signal?: AbortSignal; fromEvent?: boolean }): EventDescriptor`
+
+Bidirectionally binds a Subject to a DOM element property or event.
+
+**Parameters:**
+- `subject: Subject<any>` - Subject to bind
+- `el: E` - DOM element
+- `propOrEvent: K | keyof HTMLElementEventMap` - Property or event name
+- `opts.signal?: AbortSignal` - Optional abort signal
+- `opts.fromEvent?: boolean` - If true, bind from event to subject
+
+**Returns:** EventDescriptor for Remix
+
+#### `bridgeInteractionFactory<T>(handler: Handler<T>): InteractionDescriptor['factory']`
+
+Converts a Handler into a Remix InteractionDescriptor factory.
+
+**Parameters:**
+- `handler: Handler<T>` - Handler to convert
+
+**Returns:** Factory function for custom interactions
+
+#### `emitterToEventDescriptor<T>(emitter: Emitter<T>, type: string, signal?: AbortSignal): EventDescriptor`
+
+Converts an Emitter to a Remix EventDescriptor.
+
+**Parameters:**
+- `emitter: Emitter<T>` - Emitter to convert
+- `type: string` - Event type string
+- `signal?: AbortSignal` - Optional abort signal
+
+**Returns:** EventDescriptor
+
+### SolidJS-Style Helper Functions
+
+#### `createAsyncSubject<T>(asyncSource: () => Promise<T>, ...handlers: Handler<any>[]): Subject<T>`
+
+Creates an async reactive subject that loads from a promise and applies updates.
+
+**Parameters:**
+- `asyncSource: () => Promise<T>` - Function returning initial promise
+- `handlers: Handler<any>[]` - Handlers that apply updates
+
+**Returns:** Async subject
+
+**Example:**
+```typescript
+const data = createAsyncSubject(
+  () => fetch('/api/data').then(r => r.json()),
+  onRefresh(() => fetch('/api/data').then(r => r.json()))
+);
+```
+
+#### `createSubjectStore<T>(initial: T | (() => T), ...handlers: Handler<any>[]): Subject<T>`
+
+Creates a mutable state store (like SolidJS stores).
+
+**Parameters:**
+- `initial: T | (() => T)` - Initial state or function
+- `handlers: Handler<any>[]` - Handlers that mutate state
+
+**Returns:** Subject store
+
+**Example:**
+```typescript
+const store = createSubjectStore({ count: 0 },
+  onIncrement((delta) => (state) => {
+    state.count += delta;
+  })
+);
+```
+
+#### `createTopic<T extends any[]>(...handlers: Handler<T[number]>[]): Handler<T[number]>`
+
+Merges multiple event handlers into one.
+
+**Parameters:**
+- `handlers: Handler<T[number]>[]` - Handlers to merge
+
+**Returns:** Combined handler
+
+**Example:**
+```typescript
+const [onA, emitA] = createEvent<string>();
+const [onB, emitB] = createEvent<number>();
+
+const topic = createTopic(
+  onA((msg) => `A: ${msg}`),
+  onB((num) => `B: ${num}`)
+);
+
+topic((result) => console.log(result));
+emitA('hello'); // Logs: A: hello
+emitB(42);      // Logs: B: 42
+```
+
+#### `createPartition<T>(source: Handler<T>, predicate: (value: T) => boolean): [Handler<T>, Handler<T>]`
+
+Splits a handler based on a predicate into two handlers.
+
+**Parameters:**
+- `source: Handler<T>` - Source handler to split
+- `predicate: (value: T) => boolean` - Function to test values
+
+**Returns:** Tuple of `[trueHandler, falseHandler]`
+
+**Example:**
+```typescript
+const [onNumber, emitNumber] = createEvent<number>();
+const [onPositive, onNegative] = createPartition(onNumber, (n) => n >= 0);
+
+onPositive((n) => console.log('Positive:', n));
+onNegative((n) => console.log('Negative:', n));
+
+emitNumber(5);  // Logs: Positive: 5
+emitNumber(-3); // Logs: Negative: -3
+```
+
+#### `combineLatest<T>(...handlers: Handler<T>[]): Handler<T[]>`
+
+Combines the latest values from multiple handlers.
+
+**Parameters:**
+- `handlers: Handler<T>[]` - Handlers to combine
+
+**Returns:** Handler that emits arrays of latest values
+
+**Example:**
+```typescript
+const [onA, emitA] = createEvent<string>();
+const [onB, emitB] = createEvent<number>();
+
+const combined = combineLatest(onA, onB);
+combined(([msg, num]) => console.log(msg, num));
+
+emitA('hello');
+emitB(42);
+// Logs: hello 42
+```
 
 ### Legacy APIs (Deprecated)
 
@@ -520,6 +886,14 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `createStore` → `createSubjectStore`
 - `mergeHandlers` → `createTopic`
 - `splitHandler` → `createPartition`
+
+### Additional Exports
+
+#### Aliases
+
+- `subjectFromEvent` as `subjectFromDomEvent`
+- `subjectProperty` as `subjectDomProperty`
+- `createSubject` as `createSubjectSolid`
 
 ## 🤝 Contributing
 
