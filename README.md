@@ -131,31 +131,55 @@ on([button1, button2, button3], 'click', () => {
 });
 ```
 
-## 🔄 Remix Integration
+## 🔄 Remix Events Integration
 
-Seamless integration with Remix's event system.
+The `@doeixd/events` library is designed to work seamlessly with the low-level `@remix-run/events` system. While Remix provides the core mechanism for attaching event listeners via `EventDescriptor` objects, `@doeixd/events` provides a powerful, high-level abstraction for creating reactive and chainable event logic.
+
+The integration is made possible through a set of **bridge functions** that convert `@doeixd/events` primitives (like `Handler` and `Subject`) into Remix-compatible `EventDescriptor` objects.
+
+The primary bridge is the `toEventDescriptor` function. It allows you to build complex, type-safe event chains and then "plug them in" to any DOM element managed by Remix.
+
+### Example: A Validated Form
+
+Instead of a simple `onClick`, you can build a full validation pipeline. The final business logic will only run if all preceding steps in the chain succeed.
 
 ```typescript
-import { toEventDescriptor, subjectToEventDescriptor } from '@doeixd/events';
+import { events } from '@remix-run/events';
+import { dom, halt, toEventDescriptor } from '@doeixd/events';
 
-export default function MyComponent() {
-  const [onEvent, emitEvent] = createEvent<string>();
+// Assume we have a form element in the DOM
+const formElement = document.querySelector('form')!;
+const emailInput = formElement.querySelector('input[name="email"]') as HTMLInputElement;
 
-  // Convert to Remix EventDescriptor
-  const descriptor = toEventDescriptor(onEvent, 'custom-event');
+// 1. Create a reactive event chain using @doeixd/events DOM utilities.
+const onSubmit = dom.submit(formElement);
 
-  return (
-    <button
-      {...events(button, [descriptor])}
-      onClick={() => emitEvent('clicked')}
-    >
-      Click me
-    </button>
-  );
-}
+// 2. Chain 1: Prevent the default browser submission.
+const onSafeSubmit = onSubmit(event => {
+  event.preventDefault();
+  return event; // Pass the event down the chain
+});
+
+// 3. Chain 2: Validate the email input. If invalid, halt the chain.
+const onValidatedSubmit = onSafeSubmit(() => {
+  if (emailInput.value.includes('@')) {
+    return { email: emailInput.value }; // Pass validated data
+  }
+  console.log('Validation failed!');
+  return halt(); // Stop processing
+});
+
+// 4. Create the final Remix EventDescriptor from our chain.
+const submitDescriptor = toEventDescriptor(onValidatedSubmit, 'submit');
+
+// 5. Attach the descriptor to the form using Remix's events() function.
+const cleanup = events(formElement, [submitDescriptor]);
+
+// Later, when the component unmounts...
+// cleanup();
 ```
 
-## 🎯 SolidJS-Style APIs
+## 🎯 Solid-Events Style APIs
 
 Familiar patterns for SolidJS developers.
 
