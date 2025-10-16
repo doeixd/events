@@ -1111,36 +1111,6 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `subjectProperty` as `subjectDomProperty`
 - `createSubject` as `createSubjectSolid`
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
-
-### Development Setup
-
-```bash
-git clone https://github.com/doeixd/events.git
-cd events
-npm install
-npm run build
-npm test
-```
-
-<br />
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-<br />
-
-## 🙏 Acknowledgments
-
-Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
-
 <br />
 
 
@@ -1300,3 +1270,12 @@ While the core is the same, `@doeixd/events` differs in a few crucial ways to ac
     *   It also provides a dedicated **Remix Integration Bridge** (`toEventDescriptor`, etc.) to work seamlessly with the `@remix-run/events` package.
 
 In short, if you love the declarative event-driven patterns of `solid-events` but are working in a React, Vue, Svelte, or vanilla TypeScript/JavaScript project, **`@doeixd/events` is the library for you.** It provides the same powerful primitives with the flexibility to integrate into any ecosystem.
+
+<br />
+
+<br />
+
+
+## 🙏 Acknowledgments
+
+Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
