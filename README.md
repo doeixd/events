@@ -226,6 +226,7 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 ```
 
 <br />
+
 ## ⚠️ Gotchas and Best Practices
 
 ### Async Event Handling
@@ -254,6 +255,7 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 - Pass AbortSignal to DOM handlers for automatic cleanup
 
 <br />
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -281,6 +283,7 @@ import { DUMMY } from '@doeixd/events';
 ```
 
 <br />
+
 ## 🌐 Framework Interactions
 
 ### React
@@ -332,6 +335,7 @@ onIncrement((delta) => count(count() + delta));
 Works seamlessly without any framework - full type safety with JSDoc annotations.
 
 <br />
+
 ## 🌐 DOM Utilities (Expanded)
 
 Beyond the basic examples, here are advanced DOM patterns:
@@ -394,6 +398,7 @@ clickHandler((event) => {
 ```
 
 <br />
+
 ## 🌐 Advanced DOM Event Handling
 
 This library provides full support for native DOM events with advanced features like event phases, delegation, and standard `addEventListener` options.
@@ -573,6 +578,7 @@ const handler = fromDomEvent(button, 'click', { signal: controller.signal });
 - ✅ All event properties and methods
 
 <br />
+
 ## 📖 Advanced Examples
 
 ### Custom Event Emitter
@@ -649,6 +655,7 @@ function usePosts() {
 ```
 
 <br />
+
 ## 🏗️ Complete API Reference
 
 ### Core Types
@@ -1104,7 +1111,6 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `subjectProperty` as `subjectDomProperty`
 - `createSubject` as `createSubjectSolid`
 
-<br />
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -1124,11 +1130,13 @@ npm test
 ```
 
 <br />
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 <br />
+
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
