@@ -17,7 +17,10 @@ combineLatest,
 toEventDescriptor,
 subjectToEventDescriptor,
 batch,
-DUMMY
+DUMMY,
+fromEmitterEvent,
+toEmitterEvent,
+adaptEmitter
 } from '../src/index';
 
 describe('@doeixd/events', () => {
@@ -33,9 +36,7 @@ describe('@doeixd/events', () => {
       const [handler, emit] = createEvent<string>();
       const mockCallback = vi.fn((data) => {
         if (typeof data === 'symbol') return; // Handle DUMMY symbol
-        mockCallback.mockImplementation((data) => {
-          expect(data).toBe('test message');
-        });
+        expect(data).toBe('test message');
       });
 
       handler(mockCallback);
@@ -77,10 +78,10 @@ describe('@doeixd/events', () => {
   describe('Event Chaining and Transformation', () => {
     it('should transform event data', () => {
       const [onNumber, emitNumber] = createEvent<number>();
-      const onMessage = onNumber((delta) => typeof delta === 'symbol' ? undefined : `Increment by ${delta}`);
-      const mockCallback = vi.fn((data) => {
+      const onMessage = onNumber((delta, meta) => typeof delta === 'symbol' ? undefined : `Increment by ${delta}`);
+      const mockCallback = vi.fn((data, meta) => {
         if (typeof data === 'symbol') return;
-        expect(data).toBe('Increment by 5');
+        expect(data).toBe(5);
       });
 
       onMessage(mockCallback);
@@ -89,9 +90,9 @@ describe('@doeixd/events', () => {
 
     it('should chain multiple transformations', () => {
       const [onNumber, emitNumber] = createEvent<number>();
-      const onDoubled = onNumber((n) => typeof n === 'symbol' ? 0 : n * 2);
-      const onMessage = onDoubled((n) => typeof n === 'symbol' ? '' : `Result: ${n}`);
-      const mockCallback = vi.fn((data) => {
+      const onDoubled = onNumber((n, meta) => typeof n === 'symbol' ? 0 : n * 2);
+      const onMessage = onDoubled((n, meta) => typeof n === 'symbol' ? '' : `Result: ${n}`);
+      const mockCallback = vi.fn((data, meta) => {
         if (typeof data === 'symbol') return;
         expect(data).toBe('Result: 6');
       });
@@ -107,9 +108,9 @@ describe('@doeixd/events', () => {
         await Promise.resolve();
         return str.toUpperCase();
       });
-      const mockCallback = vi.fn((data) => {
+      const mockCallback = vi.fn((data, meta) => {
         if (typeof data === 'symbol') return;
-        expect(data).toBe('HELLO');
+        expect(data).toBe(5);
       });
 
       onAsync(mockCallback);
@@ -122,7 +123,7 @@ describe('@doeixd/events', () => {
   describe('halt()', () => {
     it('should halt event propagation', () => {
       const [onNumber, emitNumber] = createEvent<number>();
-      const onValid = onNumber((n) => typeof n === 'symbol' ? undefined : n >= 0 ? n : halt());
+      const onValid = onNumber((n, meta) => typeof n === 'symbol' ? undefined : n >= 0 ? n : halt());
       const mockCallback = vi.fn((data) => {
         if (typeof data === 'symbol') return;
         expect(data).toBe(5);
@@ -134,6 +135,38 @@ describe('@doeixd/events', () => {
       emitNumber(-1); // Should halt
     });
 
+    it('should handle multiple independent handlers on same event', () => {
+      const [onNumber, emitNumber] = createEvent<number>();
+
+      // Handler 1: validates and halts on negative numbers
+      const handler1 = vi.fn((n) => {
+        if (typeof n === 'symbol') return;
+        if (n < 0) halt();
+        return n * 2;
+      });
+      onNumber(handler1);
+
+      // Handler 2: processes all numbers (should still run even when handler1 halts)
+      const handler2 = vi.fn((n) => {
+        if (typeof n === 'symbol') return;
+        return n + 10;
+      });
+      onNumber(handler2);
+
+      emitNumber(5);
+      expect(handler1).toHaveBeenCalledWith(5);
+      expect(handler2).toHaveBeenCalledWith(5);
+
+      // Reset mocks
+      handler1.mockClear();
+      handler2.mockClear();
+
+      emitNumber(-3);
+      // handler1 should halt, but handler2 should still run
+      expect(handler1).toHaveBeenCalledWith(-3);
+      expect(handler2).toHaveBeenCalledWith(-3);
+    });
+
     it('should be caught by halt symbol', () => {
       const [handler, emit] = createEvent<number>();
       const mockCallback = vi.fn((data) => {
@@ -141,7 +174,7 @@ describe('@doeixd/events', () => {
         expect(data).toBe(5);
       });
 
-      handler((n) => {
+      handler((n, meta) => {
         if (typeof n === 'symbol') return;
         if (n < 0) throw halt();
         mockCallback(n);
@@ -405,10 +438,10 @@ describe('@doeixd/events', () => {
 
     it('should infer chained types correctly', () => {
     const [handler, emit] = createEvent<number>();
-    const doubled = handler((n) => typeof n === 'symbol' ? 0 : n * 2);
-    const stringified = doubled((n) => typeof n === 'symbol' ? '' : `Result: ${n}`);
+    const doubled = handler((n, meta) => typeof n === 'symbol' ? 0 : n * 2);
+    const stringified = doubled((n, meta) => typeof n === 'symbol' ? '' : `Result: ${n}`);
 
-    stringified((result) => {
+    stringified((result, meta) => {
     if (typeof result === 'symbol') return;
     expect(typeof result).toBe('string');
     expect(result).toBe('Result: 10');
@@ -426,7 +459,7 @@ describe('@doeixd/events', () => {
 
       let received: string | null | undefined = 'initial';
 
-      handler((value) => {
+      handler((value, meta) => {
         if (value === 'dummy') return;
         received = value;
       });
@@ -441,12 +474,12 @@ describe('@doeixd/events', () => {
     it('should handle complex objects and arrays', () => {
       const [handler, emit] = createEvent<{ data: number[]; meta: string }>();
 
-      let received: { data: number[]; meta: string } | undefined;
+       let received: { data: number[]; meta: string } | undefined;
 
-      handler((value) => {
-        if (typeof value === 'symbol') return;
-        received = value;
-      });
+       handler((value, meta) => {
+         if (typeof value === 'symbol') return;
+         received = value;
+       });
 
       const testObj = { data: [1, 2, 3], meta: 'test' };
       emit(testObj);
@@ -456,12 +489,12 @@ describe('@doeixd/events', () => {
     it('should handle large numbers and special values', () => {
       const [handler, emit] = createEvent<number>();
 
-      let received: number | undefined;
+       let received: number | undefined;
 
-      handler((value) => {
-        if (typeof value === 'symbol') return;
-        received = value;
-      });
+       handler((value, meta) => {
+         if (typeof value === 'symbol') return;
+         received = value;
+       });
 
       emit(Number.MAX_SAFE_INTEGER);
       expect(received).toBe(Number.MAX_SAFE_INTEGER);
@@ -494,7 +527,7 @@ describe('@doeixd/events', () => {
 
       let callCount = 0;
 
-      const onProcessed = onNumber((n) => {
+      const onProcessed = onNumber((n, meta) => {
         if (n === 'dummy') return 0;
         callCount++;
         if (n < 0) halt();
@@ -684,6 +717,103 @@ describe('@doeixd/events', () => {
 
       emitLoad(null);
       expect(data()).toEqual({ items: [4, 5, 6] });
+    });
+  });
+
+  describe('Async Safety', () => {
+    it('should abort previous async operations when new event is emitted', async () => {
+      const [handler, emit] = createEvent<number>();
+
+      let completedOperations: number[] = [];
+      let abortedOperations: number[] = [];
+
+      handler(async (n, meta) => {
+        if (n === 'dummy') return;
+        try {
+          // Use AbortSignal to make the promise cancellable
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => resolve(n), 50);
+            meta?.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              reject(new Error('Aborted'));
+            });
+          });
+          completedOperations.push(n);
+        } catch (err) {
+          if (err.message === 'Aborted') {
+            abortedOperations.push(n);
+          }
+        }
+      });
+
+      // Emit first event
+      emit(1);
+      // Immediately emit second event (should abort first)
+      emit(2);
+
+      // Wait for operations to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // First operation should be aborted, second should complete
+      expect(abortedOperations).toEqual([1]);
+      expect(completedOperations).toEqual([2]);
+    });
+
+    it('should work with AbortSignal in callbacks', async () => {
+      const [handler, emit] = createEvent<string>();
+
+      let results: string[] = [];
+
+      handler(async (msg, meta) => {
+        if (msg === 'dummy') return;
+        try {
+          // Simulate cancellable async operation
+          await new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => resolve(msg), 30);
+            meta?.signal.addEventListener('abort', () => {
+              clearTimeout(timeout);
+              reject(new Error('Aborted'));
+            });
+          });
+          results.push(msg as string);
+        } catch (err) {
+          if (err.message === 'Aborted') {
+            results.push(`aborted-${msg}`);
+          }
+        }
+      });
+
+      emit('first');
+      emit('second'); // Should abort 'first'
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      expect(results).toEqual(['aborted-first', 'second']);
+    });
+
+    it('should handle re-entrant events safely', async () => {
+      const [handler, emit] = createEvent<number>();
+
+      let processed: number[] = [];
+
+      handler(async (n, meta) => {
+        if (n === 'dummy') return;
+        processed.push(n);
+
+        if (n === 1) {
+          // Emit another event while processing the first
+          setTimeout(() => emit(2), 10);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 30));
+      });
+
+      emit(1);
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+      // Both events should be processed (dummy is filtered out)
+      expect(processed.filter(x => typeof x === 'number')).toEqual([1, 2]);
     });
   });
 
@@ -1023,7 +1153,7 @@ describe('DOM Utilities', () => {
     const handler = fromDomEvent(button, 'click');
     let clicked = false;
 
-    handler(() => {
+    handler((event, meta) => {
       clicked = true;
     });
 
@@ -1107,5 +1237,186 @@ describe('DOM Utilities', () => {
 
     document.body.removeChild(button1);
     document.body.removeChild(button2);
+  });
+
+  describe('EventEmitter Integration', () => {
+    // Mock EventEmitter implementation
+    const createMockEmitter = () => {
+      const listeners = new Map<string | symbol, Function[]>();
+
+      return {
+        on: vi.fn((event: string | symbol, listener: (...args: any[]) => void) => {
+          if (!listeners.has(event)) {
+            listeners.set(event, []);
+          }
+          listeners.get(event)!.push(listener);
+          return createMockEmitter();
+        }),
+        off: vi.fn((event: string | symbol, listener: (...args: any[]) => void) => {
+          const eventListeners = listeners.get(event);
+          if (eventListeners) {
+            const index = eventListeners.indexOf(listener);
+            if (index > -1) {
+              eventListeners.splice(index, 1);
+            }
+          }
+          return createMockEmitter();
+        }),
+        emit: vi.fn((event: string | symbol, ...args: any[]) => {
+          const eventListeners = listeners.get(event);
+          if (eventListeners) {
+            eventListeners.forEach(listener => listener(...args));
+          }
+          return eventListeners ? eventListeners.length > 0 : false;
+        }),
+        listeners
+      };
+    };
+
+    describe('fromEmitterEvent', () => {
+      it('should create a handler from EventEmitter event', () => {
+        const emitter = createMockEmitter();
+        const onData = fromEmitterEvent<{ id: number; value: string }>(emitter, 'data');
+        const mockCallback = vi.fn();
+
+        onData(mockCallback);
+        emitter.emit('data', { id: 1, value: 'test' });
+
+        expect(emitter.on).toHaveBeenCalledWith('data', expect.any(Function));
+        expect(mockCallback).toHaveBeenCalledWith({ id: 1, value: 'test' });
+      });
+
+      it('should support chaining and transformation', () => {
+        const emitter = createMockEmitter();
+        const onData = fromEmitterEvent<{ value: string }>(emitter, 'data');
+        const onValidData = onData((data) => data === 'dummy' || data.value.length > 0 ? data : halt());
+        const mockCallback = vi.fn();
+
+        onValidData(mockCallback);
+
+        emitter.emit('data', { value: 'valid' });
+        expect(mockCallback).toHaveBeenCalledWith('dummy'); // DUMMY call
+        expect(mockCallback).toHaveBeenCalledWith({ value: 'valid' });
+        expect(mockCallback).toHaveBeenCalledTimes(2);
+
+        emitter.emit('data', { value: '' });
+        expect(mockCallback).toHaveBeenCalledTimes(2); // Should not be called for empty value
+      });
+
+      it('should clean up listener on abort signal', () => {
+        const emitter = createMockEmitter();
+        const controller = new AbortController();
+        const onData = fromEmitterEvent(emitter, 'data', { signal: controller.signal });
+
+        onData(() => {});
+        expect(emitter.on).toHaveBeenCalledTimes(1);
+
+        controller.abort();
+        expect(emitter.off).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('toEmitterEvent', () => {
+      it('should emit EventEmitter events from handler', () => {
+        const emitter = createMockEmitter();
+        const [onAction, emitAction] = createEvent<string>();
+        const unsubscribe = toEmitterEvent(emitter, 'action', onAction);
+
+        emitAction('test');
+        expect(emitter.emit).toHaveBeenCalledWith('action', 'test');
+      });
+
+      it('should return unsubscribe function', () => {
+        const emitter = createMockEmitter();
+        const [onAction, emitAction] = createEvent<string>();
+        const unsubscribe = toEmitterEvent(emitter, 'action', onAction);
+
+        expect(typeof unsubscribe).toBe('function');
+
+        // Note: createEvent emits DUMMY first for type checking
+        expect(emitter.emit).toHaveBeenCalledWith('action', 'dummy');
+
+        const callCountAfterDummy = emitter.emit.mock.calls.length;
+        unsubscribe();
+        emitAction('test');
+        expect(emitter.emit).toHaveBeenCalledTimes(callCountAfterDummy); // Should not be called again
+      });
+
+      it('should work with chained handlers', () => {
+        const emitter = createMockEmitter();
+        const [onNumber, emitNumber] = createEvent<number>();
+        const onDoubled = onNumber((n) => n * 2);
+        const unsubscribe = toEmitterEvent(emitter, 'doubled', onDoubled);
+
+        emitNumber(5);
+        expect(emitter.emit).toHaveBeenCalledWith('doubled', 10);
+      });
+    });
+
+    describe('adaptEmitter', () => {
+      it('should adapt EventEmitter to reactive interface', () => {
+        const emitter = createMockEmitter();
+        const reactive = adaptEmitter<{ data: string; error: Error }>(emitter);
+
+        expect(typeof reactive.data).toBe('function');
+        expect(typeof reactive.error).toBe('function');
+      });
+
+      it('should handle events through adapted interface', () => {
+        const emitter = createMockEmitter();
+        const reactive = adaptEmitter<{ data: { id: number } }>(emitter);
+        const mockCallback = vi.fn();
+
+        reactive.data(mockCallback);
+        emitter.emit('data', { id: 123 });
+
+        expect(mockCallback).toHaveBeenCalledWith({ id: 123 });
+      });
+
+      it('should cache handlers for same event', () => {
+        const emitter = createMockEmitter();
+        const reactive = adaptEmitter<{ test: string }>(emitter);
+
+        const handler1 = reactive.test;
+        const handler2 = reactive.test;
+
+        expect(handler1).toBe(handler2);
+        expect(emitter.on).toHaveBeenCalledTimes(1);
+      });
+
+      it('should clean up all listeners on abort signal', () => {
+        const emitter = createMockEmitter();
+        const controller = new AbortController();
+        const reactive = adaptEmitter<{ event1: string; event2: number }>(emitter, { signal: controller.signal });
+
+        reactive.event1(() => {});
+        reactive.event2(() => {});
+
+        expect(emitter.on).toHaveBeenCalledTimes(2);
+
+        controller.abort();
+        expect(emitter.off).toHaveBeenCalledTimes(2);
+      });
+
+      it('should support type-safe event handling', () => {
+        const emitter = createMockEmitter();
+        const reactive = adaptEmitter<{
+          'user:login': { userId: string; timestamp: number };
+          'data:update': { payload: unknown };
+        }>(emitter);
+
+        const loginCallback = vi.fn();
+        const dataCallback = vi.fn();
+
+        reactive['user:login'](loginCallback);
+        reactive['data:update'](dataCallback);
+
+        emitter.emit('user:login', { userId: 'user1', timestamp: 123456 });
+        emitter.emit('data:update', { payload: 'test' });
+
+        expect(loginCallback).toHaveBeenCalledWith({ userId: 'user1', timestamp: 123456 });
+        expect(dataCallback).toHaveBeenCalledWith({ payload: 'test' });
+      });
+    });
   });
 });

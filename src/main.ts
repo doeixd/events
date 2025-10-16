@@ -36,6 +36,10 @@ export { DUMMY };
 /**
  * Halts the current event chain execution without throwing an error.
  * Useful for conditionally stopping event processing in handler chains.
+ *
+ * Note: halt() only affects the current handler chain. Other handlers
+ * attached to the same event will continue to execute normally.
+ *
  * @example
  * const [handler, emit] = createEvent<number>();
  * handler((n) => {
@@ -47,6 +51,8 @@ function halt(): never {
   throw HaltSymbol;
 }
 
+
+
 /**
  * Function to emit events with data of type T.
  */
@@ -57,9 +63,12 @@ export type Emitter<T> = (data?: T) => void;
  * Pass a callback to listen to events of type T.
  * If the callback returns void, returns an unsubscribe function.
  * If it returns a value, returns a chained Handler for further processing.
+ *
+ * The callback receives the event data and optionally a meta object containing an AbortSignal
+ * that is aborted when a new event is emitted before the current handler completes.
  */
 export type Handler<T> = <R>(
-  cb: (data: T) => R | Promise<R> | void | Promise<void>
+  cb: (data: T, meta?: { signal: AbortSignal }) => R | Promise<R> | void | Promise<void>
 ) => R extends void | Promise<void> ? Unsubscribe : Handler<Awaited<R>>;
 
 export type Unsubscribe = () => void;
@@ -85,15 +94,29 @@ function createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [
     }, { once: true });
   }
 
+  // AbortController for re-entry safety
+  let currentController: AbortController | null = null;
+
   const emit: Emitter<T> = (data?: T) => {
     if (data === undefined) data = defaultValue;
-    target.dispatchEvent(new CustomEvent(eventName, { detail: data }));
+
+    // Abort previous async operations
+    if (currentController) {
+      currentController.abort();
+    }
+
+    // Create new controller for this emission
+    currentController = new AbortController();
+
+    target.dispatchEvent(new CustomEvent(eventName, {
+      detail: { data, signal: currentController.signal }
+    }));
   };
 
 
 
   const createHandler = <A>(eventTarget: EventTarget, name: string): Handler<A> =>
-    ((cb: (data: A) => any) => {
+    ((cb: (data: A, meta?: { signal: AbortSignal }) => any) => {
       let testResult: any;
       try {
         testResult = cb(DUMMY as any);
@@ -103,9 +126,10 @@ function createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [
       }
 
       if (testResult === undefined) {
-      const listener = (ev: CustomEvent<A>) => {
-      const data = ev.detail;
-      const result = cb(data);
+      const listener = (ev: CustomEvent<{ data: A; signal: AbortSignal }>) => {
+      const { data, signal } = ev.detail;
+      // Check if callback expects meta parameter
+      const result = cb.length > 1 ? cb(data, { signal }) : cb(data);
       if (result instanceof Promise) result.catch(console.error);
       };
       eventTarget.addEventListener(name, listener as any);
@@ -117,11 +141,12 @@ function createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [
         const newTarget = new EventTarget();
         const newHandler = createHandler<any>(newTarget, newName);
 
-        const listener = (ev: CustomEvent<A>) => {
-          const data = ev.detail;
+        const listener = (ev: CustomEvent<{ data: A; signal: AbortSignal }>) => {
+          const { data, signal } = ev.detail;
           let result: any;
           try {
-            result = cb(data);
+            // Check if callback expects meta parameter
+            result = cb.length > 1 ? cb(data, { signal }) : cb(data);
           } catch (err) {
             if (err === HaltSymbol) return;
             throw err;
@@ -131,7 +156,7 @@ function createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [
             result
               .then((res) => {
                 if (res !== undefined) {
-                  newTarget.dispatchEvent(new CustomEvent(newName, { detail: res }));
+                  newTarget.dispatchEvent(new CustomEvent(newName, { detail: { data: res, signal } }));
                 }
               })
               .catch((err) => {
@@ -139,7 +164,7 @@ function createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [
                 throw err;
               });
           } else if (result !== undefined) {
-            newTarget.dispatchEvent(new CustomEvent(newName, { detail: result }));
+            newTarget.dispatchEvent(new CustomEvent(newName, { detail: { data: result, signal } }));
           }
         };
         eventTarget.addEventListener(name, listener as any);
@@ -166,7 +191,7 @@ function toEventDescriptor<T>(
   type,
   handler: ((ev: EventWithTargets<any>, _evtSignal: AbortSignal) => {
   // @ts-ignore
-  const unsub = handler(ev.detail as T);
+  const unsub = handler((ev.detail as T), { signal: _evtSignal });
   if (signal) {
   // @ts-ignore
   signal.addEventListener('abort', unsub, { once: true });
@@ -207,10 +232,11 @@ function fromDomEvent<E extends Element, K extends keyof HTMLElementEventMap>(
   eventName: K,
   opts?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }
 ): Handler<HTMLElementEventMap[K]> {
-  return ((cb: (ev: HTMLElementEventMap[K]) => any) => {
+  return ((cb: (ev: HTMLElementEventMap[K], meta?: { signal: AbortSignal }) => any) => {
     const listener = (ev: Event) => {
       try {
-        const result = cb(ev as any);
+        // Check if callback expects meta parameter
+        const result = cb.length > 1 ? cb(ev as any, { signal: new AbortController().signal }) : cb(ev as any);
         if (result instanceof Promise) result.catch(console.error);
       } catch (err) {
         if (err === HaltSymbol) return;

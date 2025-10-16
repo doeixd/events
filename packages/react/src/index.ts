@@ -39,7 +39,7 @@ import type { DependencyList } from 'react';
  */
 export function useEvent<T>(
   handler: Handler<T>,
-  callback: (data: T) => void,
+  callback: (data: T, meta?: { signal: AbortSignal }) => void,
   deps: DependencyList = []
 ): void {
   const callbackRef = useRef(callback);
@@ -50,8 +50,13 @@ export function useEvent<T>(
   }, deps);
 
   useEffect(() => {
-    const unsubscribe = handler((data) => {
-      callbackRef.current(data);
+    const unsubscribe = handler((data: T, meta?: { signal: AbortSignal }) => {
+      // Check if callback expects meta parameter
+      if (callbackRef.current.length > 1 && meta) {
+        callbackRef.current(data, meta);
+      } else {
+        callbackRef.current(data);
+      }
     });
 
     return unsubscribe;

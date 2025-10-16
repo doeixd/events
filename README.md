@@ -71,6 +71,7 @@ count(1); // logs "Count is now: 1"
 console.log(count()); // 1
 ```
 
+
 <br />
 
 ## 📚 Core API
@@ -264,6 +265,7 @@ This example shows the power of the combination:
 | `bindSubjectToDom`         | Provides two-way binding between a `Subject` and a DOM property for use within Remix. |
 | `bridgeInteractionFactory` | Converts a `Handler` into a factory for creating advanced custom Remix Interactions. |
 
+
 <br />
 
 ## Declarative APIs Inspired by Solid-Events
@@ -367,7 +369,11 @@ function Counter() {
   const [onIncrement, emitIncrement] = createEvent<number>();
   const count = createSubject(0);
 
-  useEvent(onIncrement, delta => count(count() + delta));
+  // Meta parameter is optional for async safety
+  useEvent(onIncrement, (delta, meta) => {
+    // Use meta.signal for cancellable async operations
+    count(count() + delta);
+  });
   const currentCount = useSubject(count);
 
   return <button onClick={() => emitIncrement(1)}>Count: {currentCount}</button>;
@@ -648,7 +654,7 @@ import { dom } from '@doeixd/events';
 const formHandler = dom.submit(formElement);
 formHandler((event) => {
   event.preventDefault(); // Prevent form submission
-  event.stopPropagation(); // Stop event bubbling
+  event.stopPropagation(); // Stop DOM event bubbling
 
   // Handle form submission
   console.log('Form submitted');
@@ -660,6 +666,60 @@ buttonHandler((event) => {
   event.stopImmediatePropagation();
   console.log('This handler runs first and prevents others');
 });
+```
+
+### Reactive Event Chain Propagation
+
+For reactive event chains, use `halt()` to stop propagation:
+
+```typescript
+import { createEvent, halt } from '@doeixd/events';
+
+const [onNumber, emitNumber] = createEvent<number>();
+
+// Chain with conditional halting
+const onProcessed = onNumber((n) => {
+  if (n < 0) halt(); // Stop this chain
+  return n * 2;
+});
+
+onProcessed((result) => console.log('Result:', result));
+
+emitNumber(5);  // Logs: Result: 10
+emitNumber(-1); // No output (halted)
+```
+
+**Important**: `halt()` only affects the current handler chain. Other handlers attached to the same event continue normally.
+
+### Composed Events and Bubbling
+
+When working with composed events (multiple handlers merged together), bubbling behavior depends on the composition method:
+
+```typescript
+import { createEvent, createTopic, halt } from '@doeixd/events';
+
+const [onEvent, emitEvent] = createEvent<number>();
+
+// Multiple independent handlers (each isolated)
+const handler1 = onEvent((n) => {
+  if (n < 0) halt(); // Only stops handler1
+  console.log('Handler 1:', n);
+});
+
+const handler2 = onEvent((n) => {
+  console.log('Handler 2:', n); // Always runs
+});
+
+// Composed handlers (halt affects the composed result)
+const composed = createTopic(
+  onEvent((n) => n < 0 ? halt() : n),
+  onEvent((n) => `Result: ${n}`)
+);
+
+composed((result) => console.log(result));
+
+emitEvent(5);   // Handler 1: 5, Handler 2: 5, Result: 5
+emitEvent(-1);  // Handler 1: (halted), Handler 2: -1, (composed halted)
 ```
 
 ### Advanced Event Listener Options
@@ -881,7 +941,7 @@ interface Subject<S> {
 
 #### `createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [Handler<T>, Emitter<T>]`
 
-Creates a typed event system with a handler and emitter.
+Creates a typed event system with a handler and emitter. Each emission creates a new AbortController, automatically aborting any previous async operations for safety.
 
 **Parameters:**
 - `defaultValue?: T` - Optional default value to emit when no data is provided
@@ -889,12 +949,35 @@ Creates a typed event system with a handler and emitter.
 
 **Returns:** Tuple of `[handler, emitter]`
 
-**Example:**
+**Callback Signature:**
+```typescript
+handler((data: T, meta?: { signal: AbortSignal }) => void)
+```
+
+The `meta` parameter is optional and contains an `AbortSignal` that is aborted when a new event is emitted, allowing for safe cancellation of async operations.
+
+**Examples:**
 ```typescript
 const [onMessage, emitMessage] = createEvent<string>();
 
+// Basic usage (meta parameter optional)
 onMessage((msg) => console.log('Received:', msg));
 emitMessage('Hello World!'); // Logs: Received: Hello World!
+
+// Async safety with AbortSignal
+onMessage(async (msg, meta) => {
+  if (meta?.signal.aborted) return; // Check if already aborted
+
+  try {
+    await someAsyncOperation(msg, meta.signal); // Pass signal for cancellation
+  } catch (err) {
+    if (err.name === 'AbortError') return; // Handle cancellation
+    throw err;
+  }
+});
+
+// When emitMessage is called again, previous async operations are automatically aborted
+emitMessage('New message'); // Aborts previous async operation
 ```
 
 <br>
@@ -1399,6 +1482,29 @@ These aliases are provided for backward compatibility but may be removed in futu
 
 <br />
 
+
+## 🔗 EventEmitter Integration
+
+`@doeixd/events` includes utilities for bridging with the classic EventEmitter pattern. Use `fromEmitterEvent()`, `toEmitterEvent()`, and `adaptEmitter()` to seamlessly integrate legacy EventEmitter-based systems with reactive patterns.
+
+```typescript
+import { fromEmitterEvent, toEmitterEvent, adaptEmitter } from '@doeixd/events';
+import { EventEmitter } from 'events';
+
+const emitter = new EventEmitter();
+
+// Consume events from EventEmitter
+const onData = fromEmitterEvent(emitter, 'data');
+onData((payload) => console.log('Received:', payload));
+
+// Drive EventEmitter with reactive logic
+const [onAction, emitAction] = createEvent<string>();
+toEmitterEvent(emitter, 'action', onAction);
+
+// Adapt entire emitter to reactive interface
+const reactive = adaptEmitter<{ data: string }>(emitter);
+reactive.data((payload) => console.log(payload));
+```
 
 ## 🙏 Acknowledgments
 

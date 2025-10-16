@@ -86,3 +86,6 @@ splitHandler
 } from './events-helpers';
 
 export { DUMMY } from './main';
+
+// Integrations
+export * from './integrations/emitter';
