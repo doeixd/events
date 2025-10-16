@@ -1506,50 +1506,21 @@ const reactive = adaptEmitter<{ data: string }>(emitter);
 reactive.data((payload) => console.log(payload));
 ```
 
-## 🔍 Critique and Suggestions for Further Improvement
+## 🔧 Handler Operators
 
-While these updates are excellent, here are a couple of ideas for the next iteration, building on the new momentum:
-
-### 1. Formalize "Stateful Handler Factories"
-
-The library has "stolen" async safety from Remix Events, which is great. The next logical step is to steal the concept of reusable, stateful interactions, but in a way that is native to @doeixd/events.
-
-The doubleClick logic is still presented only within the context of a Remix createInteraction. The library could be even more powerful if it provided a standalone, functional way to do this.
-
-**Suggestion:** Create a new section or helper file for "Stateful Operators" or "Handler Factories" that are pipeable.
-
-Example of what a doubleClick operator could look like:
+Building on the EventEmitter integration, `@doeixd/events` now includes pipeable handler operators for creating reusable, stateful interactions:
 
 ```typescript
-// A new utility file: @doeixd/events/operators
-import { halt, Handler } from '@doeixd/events';
-
-export function doubleClick<T extends Event>(timeout = 300) {
-  let timer = 0;
-  // This is a "pipeable operator": a function that takes a handler and returns a new one.
-  return (source: Handler<T>): Handler<T> =>
-    source(event => {
-      if (timer) {
-        clearTimeout(timer);
-        timer = 0;
-        return event; // Pass through on double click
-      }
-      timer = window.setTimeout(() => (timer = 0), timeout);
-      return halt(); // Halt on first click
-    });
-}
-
-// How it would be used in the README:
 import { dom } from '@doeixd/events';
 import { doubleClick } from '@doeixd/events/operators';
 
 const onButtonClick = dom.click(button);
-const onButtonDoubleClick = doubleClick(500)(onButtonClick); // Pipe the handler through the operator
+const onButtonDoubleClick = doubleClick(500)(onButtonClick); // Pipe through operator
 
 onButtonDoubleClick(() => console.log('Double click detected!'));
 ```
 
-This would fully bring the power of reusable interactions into the core library, making it even more of a competitor to libraries like RxJS.
+Handler operators are functions that take a `Handler` and return a new `Handler`, enabling composable, reusable event logic similar to RxJS operators.
 
 ## 🙏 Acknowledgments
 

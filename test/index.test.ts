@@ -20,7 +20,10 @@ batch,
 DUMMY,
 fromEmitterEvent,
 toEmitterEvent,
-adaptEmitter
+adaptEmitter,
+doubleClick,
+debounce,
+throttle
 } from '../src/index';
 
 describe('@doeixd/events', () => {
@@ -1416,6 +1419,118 @@ describe('DOM Utilities', () => {
 
         expect(loginCallback).toHaveBeenCalledWith({ userId: 'user1', timestamp: 123456 });
         expect(dataCallback).toHaveBeenCalledWith({ payload: 'test' });
+      });
+    });
+  });
+
+  describe('Handler Operators', () => {
+    describe('doubleClick', () => {
+      it('should trigger on double click within timeout', () => {
+        const [onEvent, emitEvent] = createEvent<MouseEvent>();
+        const doubleClickHandler = doubleClick(100)(onEvent);
+        const mockCallback = vi.fn();
+
+        doubleClickHandler(mockCallback);
+
+        // First click - should not trigger
+        emitEvent(new MouseEvent('click'));
+        expect(mockCallback).not.toHaveBeenCalled();
+
+        // Second click within timeout - should trigger
+        emitEvent(new MouseEvent('click'));
+        expect(mockCallback).toHaveBeenCalledWith(new MouseEvent('click'));
+      });
+
+      it('should not trigger if clicks are too far apart', async () => {
+        const [onEvent, emitEvent] = createEvent<MouseEvent>();
+        const doubleClickHandler = doubleClick(50)(onEvent); // Short timeout
+        const mockCallback = vi.fn();
+
+        doubleClickHandler(mockCallback);
+
+        // First click
+        emitEvent(new MouseEvent('click'));
+        expect(mockCallback).not.toHaveBeenCalled();
+
+        // Wait longer than timeout
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Second click - should not trigger
+        emitEvent(new MouseEvent('click'));
+        expect(mockCallback).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('debounce', () => {
+      it('should delay execution until after timeout', async () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const debouncedHandler = debounce(100)(onEvent);
+        const mockCallback = vi.fn();
+
+        debouncedHandler(mockCallback);
+
+        // Emit multiple events quickly
+        emitEvent('first');
+        emitEvent('second');
+        emitEvent('third');
+
+        // Should not have triggered yet
+        expect(mockCallback).not.toHaveBeenCalled();
+
+        // Wait for debounce timeout
+        await new Promise(resolve => setTimeout(resolve, 150));
+
+        // Should have triggered with the last value
+        expect(mockCallback).toHaveBeenCalledWith('third');
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+      });
+
+      it('should reset timeout on new events', async () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const debouncedHandler = debounce(100)(onEvent);
+        const mockCallback = vi.fn();
+
+        debouncedHandler(mockCallback);
+
+        emitEvent('first');
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        emitEvent('second'); // Reset timer
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        emitEvent('third'); // Reset timer again
+        await new Promise(resolve => setTimeout(resolve, 120));
+
+        expect(mockCallback).toHaveBeenCalledWith('third');
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('throttle', () => {
+      it('should limit execution to once per interval', async () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const throttledHandler = throttle(100)(onEvent);
+        const mockCallback = vi.fn();
+
+        throttledHandler(mockCallback);
+
+        // First event should trigger
+        emitEvent('first');
+        expect(mockCallback).toHaveBeenCalledWith('first');
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Events within interval should be throttled
+        emitEvent('second');
+        emitEvent('third');
+        expect(mockCallback).toHaveBeenCalledTimes(1);
+
+        // Wait for interval to pass
+        await new Promise(resolve => setTimeout(resolve, 110));
+
+        // Next event should trigger
+        emitEvent('fourth');
+        expect(mockCallback).toHaveBeenCalledWith('fourth');
+        expect(mockCallback).toHaveBeenCalledTimes(2);
       });
     });
   });

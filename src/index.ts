@@ -89,3 +89,6 @@ export { DUMMY } from './main';
 
 // Integrations
 export * from './integrations/emitter';
+
+// Operators
+export * from './operators';
