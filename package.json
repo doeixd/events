@@ -1,6 +1,6 @@
 {
   "name": "@doeixd/events",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "files": [
     "dist",
     "src"
@@ -28,7 +28,7 @@
     "vitest": "^2.1.8"
   },
   "scripts": {
-    "release": "standard-version && git push --follow-tags origin main",
+    "release": "standard-version && git push --follow-tags origin master",
     "prepublishOnly": "pridepack clean && pridepack build",
     "build": "pridepack build",
     "type-check": "pridepack check",
