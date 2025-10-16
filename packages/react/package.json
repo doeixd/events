@@ -1,0 +1,48 @@
+{
+  "name": "@doeixd/react",
+  "version": "0.0.1",
+  "description": "React hooks for @doeixd/events - seamless integration with React components",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "keywords": [
+    "react",
+    "hooks",
+    "reactive",
+    "events",
+    "typescript"
+  ],
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "@doeixd/events": "^0.0.6"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "react": "^18.0.0",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "repository": {
+    "url": "https://github.com/doeixd/events",
+    "type": "git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/doeixd/events/tree/main/packages/react",
+  "bugs": {
+    "url": "https://github.com/doeixd/events/issues"
+  },
+  "author": "Patrick Glenn",
+  "publishConfig": {
+    "access": "public"
+  }
+}

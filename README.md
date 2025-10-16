@@ -30,6 +30,48 @@ yarn add @doeixd/events
 pnpm add @doeixd/events
 ```
 
+## 🎯 Framework Integrations
+
+### React Hooks (`@doeixd/react`)
+
+For seamless React integration with automatic subscription lifecycle management:
+
+```bash
+npm install @doeixd/react
+```
+
+```tsx
+import { useEvent, useSubject, useSubjectSelector } from '@doeixd/react';
+import { createEvent, createSubject } from '@doeixd/events';
+
+function Counter() {
+  const [onIncrement, emitIncrement] = createEvent<number>();
+  const count = createSubject(0);
+
+  useEvent(onIncrement, delta => count(count() + delta));
+  const currentCount = useSubject(count);
+
+  return <button onClick={() => emitIncrement(1)}>Count: {currentCount}</button>;
+}
+```
+
+### Performance Optimizations
+
+Enable batched updates to prevent redundant computations in complex reactive graphs:
+
+```typescript
+import { createSubject, batch } from '@doeixd/events';
+
+// Per-subject batching (batches individual updates)
+const user = createSubject(null, { batch: true });
+
+// Manual batching (batch multiple operations)
+batch(() => {
+  firstName('John');
+  lastName('Doe'); // All notifications happen once at end
+});
+```
+
 <br />
 
 ## 🚀 Quick Start
@@ -476,6 +518,8 @@ onIncrement((delta) => count(count() + delta));
 <button on:click={() => emitIncrement(1)}>Count: {$count}</button>
 ```
 
+**Note:** `@doeixd/events` subjects are fully compatible with Svelte's store contract, enabling the `$` auto-subscription syntax out of the box.
+
 ### Vanilla JavaScript
 Works seamlessly without any framework - full type safety with JSDoc annotations.
 
@@ -851,12 +895,13 @@ emitMessage('Hello World!'); // Logs: Received: Hello World!
 <br>
 
 
-#### `createSubject<T>(initial?: T): Subject<T>`
+#### `createSubject<T>(initial?: T, options?: { batch?: boolean }): Subject<T>`
 
 Creates a reactive subject that holds a value and notifies subscribers.
 
 **Parameters:**
 - `initial?: T` - Initial value for the subject
+- `options.batch?: boolean` - Whether to batch notifications (default: false)
 
 **Returns:** Subject instance
 
@@ -867,6 +912,9 @@ count.subscribe((value) => console.log('Count:', value));
 
 count(5); // Logs: Count: 5
 console.log(count()); // 5
+
+// Batched subject
+const batched = createSubject(0, { batch: true });
 ```
 
 <br>
@@ -889,6 +937,26 @@ const count = createSubject(0, onIncrement((delta) => (current) => current + del
 
 emitIncrement(5);
 console.log(count()); // 5
+```
+
+<br>
+
+
+#### `batch<T>(fn: () => T): T`
+
+Executes a function with batched updates. All subject notifications are deferred until the end of the microtask, preventing redundant computations.
+
+**Parameters:**
+- `fn: () => T` - Function to execute with batching
+
+**Returns:** Result of the function
+
+**Example:**
+```typescript
+batch(() => {
+  subject1('value1');
+  subject2('value2'); // Notifications happen once at end
+});
 ```
 
 <br>

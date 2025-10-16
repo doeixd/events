@@ -14,16 +14,17 @@
 
 // Core event system
 export {
-HaltSymbol,
-halt,
-createEvent,
-toEventDescriptor,
-subjectToEventDescriptor,
-fromDomEvent,
-type Emitter,
-type Handler,
-type Subject,
-type Unsubscribe
+  HaltSymbol,
+  halt,
+  createEvent,
+  toEventDescriptor,
+  subjectToEventDescriptor,
+  fromDomEvent,
+  batch,
+  type Emitter,
+  type Handler,
+  type Subject,
+  type Unsubscribe
 } from './main';
 
 import { createSubject as coreCreateSubject, type Subject } from './main';
@@ -31,12 +32,19 @@ import { createSubject as solidCreateSubject } from './events-helpers';
 
 // Overloaded createSubject to support both core and SolidJS-style usage
 export function createSubject<T>(initial?: T): Subject<T>;
+export function createSubject<T>(initial?: T, options?: { batch?: boolean }): Subject<T>;
 export function createSubject<T>(initial: T | (() => T), ...handlers: any[]): Subject<T>;
-export function createSubject<T>(initial?: T | (() => T), ...handlers: any[]): Subject<T> {
-  if (handlers.length > 0 || typeof initial === 'function') {
-    return solidCreateSubject(initial as any, ...handlers);
+export function createSubject<T>(initial?: T | (() => T), secondArg?: { batch?: boolean } | any, ...handlers: any[]): Subject<T> {
+  // If second argument is an object and no handlers, it's options for core createSubject
+  if (secondArg && typeof secondArg === 'object' && !Array.isArray(secondArg) && handlers.length === 0) {
+    return coreCreateSubject(initial as T | undefined, secondArg);
+  }
+  // If there are handlers or initial is a function or secondArg is a function, it's SolidJS-style
+  if (handlers.length > 0 || typeof initial === 'function' || (secondArg && typeof secondArg === 'function')) {
+    const allHandlers = [secondArg, ...handlers].filter(h => h !== undefined);
+    return solidCreateSubject(initial as any, ...allHandlers);
   } else {
-    return coreCreateSubject(initial);
+    return coreCreateSubject(initial as T | undefined);
   }
 }
 

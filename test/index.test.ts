@@ -16,6 +16,7 @@ createSubjectStore,
 combineLatest,
 toEventDescriptor,
 subjectToEventDescriptor,
+batch,
 DUMMY
 } from '../src/index';
 
@@ -905,6 +906,110 @@ describe('@doeixd/events', () => {
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(received).toBe(10);
+    });
+  });
+
+  describe('Batching', () => {
+    it('should batch notifications with batch() function', async () => {
+      const subject1 = createSubject(0);
+      const subject2 = createSubject(0);
+
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+
+      subject1.subscribe(callback1);
+      subject2.subscribe(callback2);
+
+      // Initial calls
+      expect(callback1).toHaveBeenCalledWith(0);
+      expect(callback2).toHaveBeenCalledWith(0);
+
+      callback1.mockClear();
+      callback2.mockClear();
+
+      // Batch updates
+      batch(() => {
+        subject1(1);
+        subject2(2);
+      });
+
+      // Should be called once each after batch
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(callback1).toHaveBeenCalledWith(1);
+      expect(callback2).toHaveBeenCalledWith(2);
+      expect(callback1).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledTimes(1);
+    });
+
+    it('should support batched subjects', async () => {
+      const subject = createSubject(0, { batch: true });
+
+      const callback = vi.fn();
+      subject.subscribe(callback);
+
+      // Initial call
+      expect(callback).toHaveBeenCalledWith(0);
+      callback.mockClear();
+
+      // Updates should be batched
+      subject(1);
+      subject(2);
+      subject(3);
+
+      // Should only notify once at end of microtask
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(callback).toHaveBeenCalledWith(3);
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle nested batching', async () => {
+      const subject = createSubject(0);
+
+      const callback = vi.fn();
+      subject.subscribe(callback);
+
+      callback.mockClear();
+
+      batch(() => {
+        subject(1);
+        batch(() => {
+          subject(2);
+        });
+        subject(3);
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(callback).toHaveBeenCalledWith(3);
+      expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should work with regular subjects in batch', async () => {
+      const regularSubject = createSubject(0);
+      const batchedSubject = createSubject(0, { batch: true });
+
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+
+      regularSubject.subscribe(callback1);
+      batchedSubject.subscribe(callback2);
+
+      callback1.mockClear();
+      callback2.mockClear();
+
+      batch(() => {
+        regularSubject(1);
+        batchedSubject(2);
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(callback1).toHaveBeenCalledWith(1);
+      expect(callback2).toHaveBeenCalledWith(2);
+      expect(callback1).toHaveBeenCalledTimes(1);
+      expect(callback2).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -153,6 +153,9 @@ export function subjectProperty<
         controller.abort();
         subscribers.clear();
       },
+      _notifyImmediate: (value: T[K]) => {
+        subscribers.forEach(cb => cb(value));
+      },
     }
   );
 
@@ -186,6 +189,9 @@ export function subjectFromEvent<
       dispose: () => {
         controller.abort();
         subscribers.clear();
+      },
+      _notifyImmediate: (value: HTMLElementEventMap[K]) => {
+        subscribers.forEach(cb => cb(value));
       },
     }
   );

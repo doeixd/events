@@ -236,30 +236,94 @@ export interface Subject<S> {
   (value?: S): S;
   subscribe(cb: (value: S) => void): Unsubscribe;
   dispose?: () => void;
+  _notifyImmediate: (value: S) => void; // Internal method for batching
+}
+
+// Global batching state
+let batchDepth = 0;
+let pendingNotifications = new Map<Subject<any>, any>();
+
+/**
+ * Executes a function with batched updates. All subject notifications are deferred
+ * until the end of the microtask, preventing redundant computations.
+ * @param fn Function to execute with batching
+ * @example
+ * batch(() => {
+ *   subject1('value1');
+ *   subject2('value2'); // Notifications happen once at end
+ * });
+ */
+function batch<T>(fn: () => T): T {
+  batchDepth++;
+  try {
+    return fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0) {
+      // Schedule flush at end of microtask
+      queueMicrotask(() => {
+        pendingNotifications.forEach((value, subject) => {
+          subject._notifyImmediate(value);
+        });
+        pendingNotifications.clear();
+      });
+    }
+  }
 }
 
 /**
  * Creates a reactive subject that can hold a value and notify subscribers.
  * Call subject() to get the current value, subject(newValue) to set and notify.
+ * @param initial Initial value for the subject
+ * @param options Configuration options
+ * @param options.batch Whether to batch notifications (default: false)
  * @example
  * const count = createSubject(0);
  * count.subscribe((value) => console.log('Count:', value));
- * count(1); // Logs: Count: 1
- * console.log(count()); // 1
+ * count(5); // Logs: Count: 5
+ * console.log(count()); // 5
+ *
+ * // Batched subject
+ * const batched = createSubject(0, { batch: true });
  */
-function createSubject<T>(initial?: T): Subject<T> {
+function createSubject<T>(initial?: T, options?: { batch?: boolean }): Subject<T> {
   let current = initial;
   const subscribers = new Set<(value: T) => void>();
+  const isBatched = options?.batch ?? false;
+
+  const notify = (value: T) => {
+    if (batchDepth > 0) {
+      // In manual batch, always queue
+      pendingNotifications.set(subject, value);
+    } else if (isBatched) {
+      // For batched subjects, queue and flush immediately
+      pendingNotifications.set(subject, value);
+      queueMicrotask(() => {
+        pendingNotifications.forEach((val, subj) => {
+          subj._notifyImmediate(val);
+        });
+        pendingNotifications.clear();
+      });
+    } else {
+      // Immediate notification
+      subscribers.forEach(cb => cb(value));
+    }
+  };
 
   const subject = ((value?: T) => {
     if (value === undefined) {
       return current;
     } else {
       current = value;
-      subscribers.forEach(cb => cb(current as T));
+      notify(current as T);
       return current;
     }
   }) as Subject<T>;
+
+  // Internal method for immediate notification (used by batch flush)
+  subject._notifyImmediate = (value: T) => {
+    subscribers.forEach(cb => cb(value));
+  };
 
   subject.subscribe = (cb: (value: T) => void) => {
     subscribers.add(cb);
@@ -269,6 +333,7 @@ function createSubject<T>(initial?: T): Subject<T> {
 
   subject.dispose = () => {
     subscribers.clear();
+    pendingNotifications.delete(subject);
   };
 
   return subject;
@@ -285,5 +350,6 @@ export {
   toEventDescriptor,
   subjectToEventDescriptor,
   fromDomEvent,
-  createSubject
+  createSubject,
+  batch
 };
