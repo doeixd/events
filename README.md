@@ -61,8 +61,10 @@ onFinalMessage(message => console.log(message));
 
 emitIncrement(-1); // No output (halted)
 emitIncrement(5);  // logs "Valid increment: 5"
+```
 
 <br />
+
 ## 📚 Core API
 
 ### Event System
