@@ -827,6 +827,9 @@ interface Subject<S> {
 
 ### Core Functions
 
+<br>
+
+
 #### `createEvent<T>(defaultValue?: T, options?: { signal?: AbortSignal }): [Handler<T>, Emitter<T>]`
 
 Creates a typed event system with a handler and emitter.
@@ -845,6 +848,9 @@ onMessage((msg) => console.log('Received:', msg));
 emitMessage('Hello World!'); // Logs: Received: Hello World!
 ```
 
+<br>
+
+
 #### `createSubject<T>(initial?: T): Subject<T>`
 
 Creates a reactive subject that holds a value and notifies subscribers.
@@ -862,6 +868,9 @@ count.subscribe((value) => console.log('Count:', value));
 count(5); // Logs: Count: 5
 console.log(count()); // 5
 ```
+
+<br>
+
 
 #### `createSubject<T>(initial: T | (() => T), ...handlers: Handler<any>[]): Subject<T>` (SolidJS-style)
 
@@ -882,6 +891,9 @@ emitIncrement(5);
 console.log(count()); // 5
 ```
 
+<br>
+
+
 #### `halt(): never`
 
 Halts the current event chain execution without throwing an error.
@@ -901,11 +913,17 @@ emitNumber(5);  // Logs: Processing: 5
 emitNumber(-1); // No log (halted)
 ```
 
+<br>
+
+
 #### `DUMMY: string`
 
 Special value used internally for type checking handlers. You typically don't need to use this directly.
 
 ### DOM Functions
+
+<br>
+
 
 #### `fromDomEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean; once?: boolean }): Handler<HTMLElementEventMap[K]>`
 
@@ -942,6 +960,9 @@ submitHandler((e) => {
   console.log('Form submitted (listener removed)');
 });
 ```
+
+<br>
+
 
 #### `dom`
 
@@ -982,6 +1003,9 @@ const touchHandler = dom.touchmove(element, { passive: true });
 touchHandler((e) => console.log('Touch moved'));
 ```
 
+<br>
+
+
 #### `subjectProperty<T extends Element, K extends keyof T>(el: T, prop: K, eventName?: keyof HTMLElementEventMap): Subject<T[K]>`
 
 Creates a reactive Subject bound to a DOM element property.
@@ -1001,6 +1025,9 @@ const value = subjectProperty(input, 'value');
 value.subscribe((val) => console.log('Input value:', val));
 ```
 
+<br>
+
+
 #### `subjectFromEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K): Subject<HTMLElementEventMap[K]>`
 
 Converts a DOM event stream into a reactive Subject.
@@ -1018,6 +1045,9 @@ const clicks = subjectFromEvent(button, 'click');
 
 clicks.subscribe((event) => console.log('Button clicked at:', event.clientX, event.clientY));
 ```
+
+<br>
+
 
 #### `on<E extends Element>(elements: E[] | NodeListOf<E>, event: keyof HTMLElementEventMap, handler: (ev: HTMLElementEventMap[typeof event]) => void, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean; once?: boolean }): Unsubscribe`
 
@@ -1056,6 +1086,9 @@ touchUnsub(); // Removes touch listeners
 
 ### Remix Bridge Functions
 
+<br>
+
+
 #### `toEventDescriptor<T>(handler: Handler<T>, type: string, signal?: AbortSignal): EventDescriptor`
 
 Converts a Handler to a Remix EventDescriptor.
@@ -1076,6 +1109,9 @@ const descriptor = toEventDescriptor(onEvent, 'custom-event');
 events(button, [descriptor]);
 ```
 
+<br>
+
+
 #### `subjectToEventDescriptor<T>(subject: Subject<T>, type: string, signal?: AbortSignal): EventDescriptor`
 
 Converts a Subject to a Remix EventDescriptor.
@@ -1087,6 +1123,9 @@ Converts a Subject to a Remix EventDescriptor.
 
 **Returns:** Remix EventDescriptor
 
+<br>
+
+
 #### `fromDomHandler<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, opts?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }): Handler<HTMLElementEventMap[K]>`
 
 Creates a DOM handler for Remix integration.
@@ -1097,6 +1136,9 @@ Creates a DOM handler for Remix integration.
 - `opts?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }` - Options
 
 **Returns:** Handler for DOM events
+
+<br>
+
 
 #### `bindSubjectToDom<E extends Element, K extends keyof E>(subject: Subject<any>, el: E, propOrEvent: K | keyof HTMLElementEventMap, opts?: { signal?: AbortSignal; fromEvent?: boolean }): EventDescriptor`
 
@@ -1111,6 +1153,9 @@ Bidirectionally binds a Subject to a DOM element property or event.
 
 **Returns:** EventDescriptor for Remix
 
+<br>
+
+
 #### `bridgeInteractionFactory<T>(handler: Handler<T>): InteractionDescriptor['factory']`
 
 Converts a Handler into a Remix InteractionDescriptor factory.
@@ -1119,6 +1164,9 @@ Converts a Handler into a Remix InteractionDescriptor factory.
 - `handler: Handler<T>` - Handler to convert
 
 **Returns:** Factory function for custom interactions
+
+<br>
+
 
 #### `emitterToEventDescriptor<T>(emitter: Emitter<T>, type: string, signal?: AbortSignal): EventDescriptor`
 
@@ -1132,6 +1180,9 @@ Converts an Emitter to a Remix EventDescriptor.
 **Returns:** EventDescriptor
 
 ### SolidJS-Style Helper Functions
+
+<br>
+
 
 #### `createAsyncSubject<T>(asyncSource: () => Promise<T>, ...handlers: Handler<any>[]): Subject<T>`
 
@@ -1151,6 +1202,9 @@ const data = createAsyncSubject(
 );
 ```
 
+<br>
+
+
 #### `createSubjectStore<T>(initial: T | (() => T), ...handlers: Handler<any>[]): Subject<T>`
 
 Creates a mutable state store (like SolidJS stores).
@@ -1169,6 +1223,9 @@ const store = createSubjectStore({ count: 0 },
   })
 );
 ```
+
+<br>
+
 
 #### `createTopic<T extends any[]>(...handlers: Handler<T[number]>[]): Handler<T[number]>`
 
@@ -1194,6 +1251,9 @@ emitA('hello'); // Logs: A: hello
 emitB(42);      // Logs: B: 42
 ```
 
+<br>
+
+
 #### `createPartition<T>(source: Handler<T>, predicate: (value: T) => boolean): [Handler<T>, Handler<T>]`
 
 Splits a handler based on a predicate into two handlers.
@@ -1215,6 +1275,9 @@ onNegative((n) => console.log('Negative:', n));
 emitNumber(5);  // Logs: Positive: 5
 emitNumber(-3); // Logs: Negative: -3
 ```
+
+<br>
+
 
 #### `combineLatest<T>(...handlers: Handler<T>[]): Handler<T[]>`
 
@@ -1249,6 +1312,9 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `splitHandler` → `createPartition`
 
 ### Additional Exports
+
+<br>
+
 
 #### Aliases
 
