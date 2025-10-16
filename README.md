@@ -5,6 +5,8 @@
 
 A powerful, type-safe reactive event system for TypeScript/JavaScript applications. Inspired by solid-events and remix events, this library provides SolidJS-style primitives, DOM utilities, and seamless Remix integration for building reactive user interfaces and event-driven architectures.
 
+<br />
+
 ## ✨ Features
 
 - 🚀 **Reactive Subjects**: Observable values with automatic dependency tracking
@@ -16,6 +18,8 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 - 🔒 **Type-Safe**: Full TypeScript support with excellent inference
 - 🛠️ **Framework Agnostic**: Works with React, Vue, Svelte, or vanilla JS
 
+<br />
+
 ## 📦 Installation
 
 ```bash
@@ -25,6 +29,8 @@ yarn add @doeixd/events
 # or
 pnpm add @doeixd/events
 ```
+
+<br />
 
 ## 🚀 Quick Start
 
@@ -56,28 +62,7 @@ onFinalMessage(message => console.log(message));
 emitIncrement(-1); // No output (halted)
 emitIncrement(5);  // logs "Valid increment: 5"
 
-// Async event handling (promises are automatically flattened)
-const [onCreateBoard, emitCreateBoard] = createEvent();
-
-const onBoardCreated = onCreateBoard(async (boardData) => {
-  // Simulate async operation
-  const boardId = await Promise.resolve('board-123');
-  return boardId;
-});
-
-onBoardCreated(boardId => console.log('Navigate to:', `/board/${boardId}`));
-
-emitCreateBoard({ title: 'My Board' });
-// Eventually logs "Navigate to: /board/board-123"
-
-// Reactive subjects
-const count = createSubject(0);
-count.subscribe((value) => console.log('count', value));
-
-count(1); // logs "count 1"
-console.log(count()); // 1
-```
-
+<br />
 ## 📚 Core API
 
 ### Event System
@@ -240,6 +225,7 @@ const user = createSubject({ name: 'John', age: 30 });
 user.subscribe((u) => console.log(u.name)); // u is fully typed
 ```
 
+<br />
 ## ⚠️ Gotchas and Best Practices
 
 ### Async Event Handling
@@ -267,6 +253,7 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 - Use `dispose()` on subjects to clear subscribers
 - Pass AbortSignal to DOM handlers for automatic cleanup
 
+<br />
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -293,6 +280,7 @@ import { DUMMY } from '@doeixd/events';
 // Used automatically - you typically don't need to use it directly
 ```
 
+<br />
 ## 🌐 Framework Interactions
 
 ### React
@@ -343,6 +331,7 @@ onIncrement((delta) => count(count() + delta));
 ### Vanilla JavaScript
 Works seamlessly without any framework - full type safety with JSDoc annotations.
 
+<br />
 ## 🌐 DOM Utilities (Expanded)
 
 Beyond the basic examples, here are advanced DOM patterns:
@@ -404,6 +393,7 @@ clickHandler((event) => {
 });
 ```
 
+<br />
 ## 🌐 Advanced DOM Event Handling
 
 This library provides full support for native DOM events with advanced features like event phases, delegation, and standard `addEventListener` options.
@@ -582,6 +572,7 @@ const handler = fromDomEvent(button, 'click', { signal: controller.signal });
 - ✅ Custom events
 - ✅ All event properties and methods
 
+<br />
 ## 📖 Advanced Examples
 
 ### Custom Event Emitter
@@ -657,6 +648,7 @@ function usePosts() {
 }
 ```
 
+<br />
 ## 🏗️ Complete API Reference
 
 ### Core Types
@@ -1112,6 +1104,7 @@ These aliases are provided for backward compatibility but may be removed in futu
 - `subjectProperty` as `subjectDomProperty`
 - `createSubject` as `createSubjectSolid`
 
+<br />
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -1130,14 +1123,16 @@ npm run build
 npm test
 ```
 
+<br />
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+<br />
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
 
----
+<br />
 
 Made with ❤️ for the reactive programming community
