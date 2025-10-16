@@ -404,6 +404,184 @@ clickHandler((event) => {
 });
 ```
 
+## 🌐 Advanced DOM Event Handling
+
+This library provides full support for native DOM events with advanced features like event phases, delegation, and standard `addEventListener` options.
+
+### Event Phases: Bubbling vs Capturing
+
+DOM events propagate through three phases: **capturing**, **target**, and **bubbling**. By default, events bubble up from the target element to the root.
+
+```typescript
+import { fromDomEvent } from '@doeixd/events';
+
+// Bubbling phase (default)
+const bubblingHandler = fromDomEvent(childElement, 'click');
+bubblingHandler((event) => {
+  console.log('Bubbling phase');
+});
+
+// Capturing phase
+const capturingHandler = fromDomEvent(parentElement, 'click', { capture: true });
+capturingHandler((event) => {
+  console.log('Capturing phase');
+});
+```
+
+### Native DOM Event Support
+
+Works with all standard DOM events and their native properties:
+
+```typescript
+import { dom } from '@doeixd/events';
+
+const mouseHandler = dom.mousemove(document.body);
+mouseHandler((event) => {
+  console.log('Mouse at:', event.clientX, event.clientY);
+  console.log('Target:', event.target);
+  console.log('Current target:', event.currentTarget);
+});
+
+// Access all native event properties
+const keyHandler = dom.keydown(window);
+keyHandler((event) => {
+  console.log('Key pressed:', event.key);
+  console.log('Code:', event.code);
+  console.log('Ctrl pressed:', event.ctrlKey);
+});
+```
+
+### Event Prevention and Propagation Control
+
+```typescript
+import { dom } from '@doeixd/events';
+
+const formHandler = dom.submit(formElement);
+formHandler((event) => {
+  event.preventDefault(); // Prevent form submission
+  event.stopPropagation(); // Stop event bubbling
+
+  // Handle form submission
+  console.log('Form submitted');
+});
+
+// Stop immediate propagation (prevents other handlers on same element)
+const buttonHandler = dom.click(button, { capture: true });
+buttonHandler((event) => {
+  event.stopImmediatePropagation();
+  console.log('This handler runs first and prevents others');
+});
+```
+
+### Advanced Event Listener Options
+
+```typescript
+import { fromDomEvent } from '@doeixd/events';
+
+// Passive listeners (improves scroll performance)
+const scrollHandler = fromDomEvent(window, 'scroll', { passive: true });
+scrollHandler(() => {
+  // This won't block scrolling
+  console.log('Scrolled');
+});
+
+// Once-only listeners
+const clickOnceHandler = fromDomEvent(button, 'click', { once: true });
+clickOnceHandler(() => {
+  console.log('This will only fire once');
+});
+
+// Combined options
+const advancedHandler = fromDomEvent(element, 'touchstart', {
+  capture: true,
+  passive: false,
+  signal: abortController.signal
+});
+```
+
+### Custom Events
+
+```typescript
+import { fromDomEvent } from '@doeixd/events';
+
+// Listen for custom events
+const customHandler = fromDomEvent(window, 'my-custom-event' as any);
+customHandler((event: CustomEvent) => {
+  console.log('Custom event data:', event.detail);
+});
+
+// Dispatch custom events
+const customEvent = new CustomEvent('my-custom-event', {
+  detail: { message: 'Hello!' }
+});
+window.dispatchEvent(customEvent);
+```
+
+### Event Delegation Patterns
+
+```typescript
+import { fromDomEvent } from '@doeixd/events';
+
+// Delegate to parent element
+const listHandler = fromDomEvent(document.getElementById('list'), 'click');
+listHandler((event) => {
+  const target = event.target as HTMLElement;
+
+  // Handle different child elements
+  if (target.matches('.delete-btn')) {
+    const itemId = target.dataset.id;
+    deleteItem(itemId);
+  } else if (target.matches('.edit-btn')) {
+    const itemId = target.dataset.id;
+    editItem(itemId);
+  }
+});
+
+// Multiple event types on same element
+const multiHandler = fromDomEvent(container, 'click');
+multiHandler((event) => {
+  if (event.target.matches('button')) {
+    handleButtonClick(event);
+  } else if (event.target.matches('a')) {
+    handleLinkClick(event);
+  }
+});
+```
+
+### Performance Considerations
+
+```typescript
+import { fromDomEvent, dom } from '@doeixd/events';
+
+// Use passive listeners for scroll/touch events
+const touchHandler = dom.touchmove(document.body, { passive: true });
+
+// Debounce high-frequency events
+let scrollTimeout: number;
+const scrollHandler = dom.scroll(window, { passive: true });
+scrollHandler(() => {
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(() => {
+    console.log('Scroll settled');
+  }, 100);
+});
+
+// Use AbortController for cleanup
+const controller = new AbortController();
+const handler = fromDomEvent(button, 'click', { signal: controller.signal });
+
+// Later: controller.abort(); // Removes the listener
+```
+
+### Browser Compatibility
+
+- ✅ Modern browsers (Chrome, Firefox, Safari, Edge)
+- ✅ All standard DOM events supported
+- ✅ Event listener options (`capture`, `passive`, `once`)
+- ✅ AbortSignal for cleanup
+- ✅ Custom events
+- ✅ All event properties and methods
+
 ## 📖 Advanced Examples
 
 ### Custom Event Emitter
@@ -585,30 +763,45 @@ Special value used internally for type checking handlers. You typically don't ne
 
 ### DOM Functions
 
-#### `fromDomEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean }): Handler<HTMLElementEventMap[K]>`
+#### `fromDomEvent<E extends Element, K extends keyof HTMLElementEventMap>(el: E, eventName: K, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean; once?: boolean }): Handler<HTMLElementEventMap[K]>`
 
-Creates a type-safe DOM event handler with AbortSignal support.
+Creates a type-safe DOM event handler with full `addEventListener` options support.
 
 **Parameters:**
 - `el: E` - DOM element to attach the event to
 - `eventName: K` - Event name (e.g., 'click', 'input')
 - `options.signal?: AbortSignal` - Optional abort signal for cleanup
-- `options.capture?: boolean` - Use capture phase
-- `options.passive?: boolean` - Passive listener
+- `options.capture?: boolean` - Use capture phase instead of bubbling (default: false)
+- `options.passive?: boolean` - Passive listener (improves performance for scroll/touch)
+- `options.once?: boolean` - Remove listener after first event
 
 **Returns:** Handler for the DOM event
 
-**Example:**
+**Examples:**
 ```typescript
 const button = document.querySelector('button')!;
-const clickHandler = fromDomEvent(button, 'click');
 
+// Basic usage
+const clickHandler = fromDomEvent(button, 'click');
 clickHandler(() => console.log('Clicked!'));
+
+// With options
+const scrollHandler = fromDomEvent(window, 'scroll', {
+  passive: true,  // Improves scroll performance
+  capture: false  // Use bubbling phase (default)
+});
+
+// Once-only listener
+const submitHandler = fromDomEvent(form, 'submit', { once: true });
+submitHandler((e) => {
+  e.preventDefault();
+  console.log('Form submitted (listener removed)');
+});
 ```
 
 #### `dom`
 
-Object containing shortcuts for common DOM events.
+Object containing shortcuts for common DOM events. All shortcuts support the same options as `fromDomEvent`.
 
 **Available shortcuts:**
 - `dom.click<E extends Element>(el: E, options?)`
@@ -628,12 +821,21 @@ Object containing shortcuts for common DOM events.
 - `dom.touchend<E extends Element>(el: E, options?)`
 - `dom.touchmove<E extends Element>(el: E, options?)`
 
-**Example:**
+**Examples:**
 ```typescript
 const button = document.querySelector('button')!;
-const clickHandler = dom.click(button);
 
+// Basic usage
+const clickHandler = dom.click(button);
 clickHandler(() => console.log('Button clicked!'));
+
+// With event phase control
+const capturingClick = dom.click(parentElement, { capture: true });
+capturingClick(() => console.log('Captured click'));
+
+// Passive touch for better performance
+const touchHandler = dom.touchmove(element, { passive: true });
+touchHandler((e) => console.log('Touch moved'));
 ```
 
 #### `subjectProperty<T extends Element, K extends keyof T>(el: T, prop: K, eventName?: keyof HTMLElementEventMap): Subject<T[K]>`
@@ -673,24 +875,39 @@ const clicks = subjectFromEvent(button, 'click');
 clicks.subscribe((event) => console.log('Button clicked at:', event.clientX, event.clientY));
 ```
 
-#### `on<E extends Element>(elements: E[] | NodeListOf<E>, event: keyof HTMLElementEventMap, handler: (ev: HTMLElementEventMap[typeof event]) => void, options?: { signal?: AbortSignal }): Unsubscribe`
+#### `on<E extends Element>(elements: E[] | NodeListOf<E>, event: keyof HTMLElementEventMap, handler: (ev: HTMLElementEventMap[typeof event]) => void, options?: { signal?: AbortSignal; capture?: boolean; passive?: boolean; once?: boolean }): Unsubscribe`
 
-Attaches an event handler to multiple elements.
+Attaches an event handler to multiple elements with full event options support.
 
 **Parameters:**
 - `elements: E[] | NodeListOf<E>` - Elements to attach to
 - `event: keyof HTMLElementEventMap` - Event name
 - `handler: (ev: HTMLElementEventMap[typeof event]) => void` - Event handler
-- `options.signal?: AbortSignal` - Optional abort signal
+- `options.signal?: AbortSignal` - Optional abort signal for cleanup
+- `options.capture?: boolean` - Use capture phase
+- `options.passive?: boolean` - Passive listener
+- `options.once?: boolean` - Remove listeners after first event
 
-**Returns:** Unsubscribe function
+**Returns:** Unsubscribe function (removes all listeners)
 
-**Example:**
+**Examples:**
 ```typescript
 const buttons = document.querySelectorAll('.my-button');
+
+// Basic multi-element handling
 const unsub = on(buttons, 'click', (event) => {
   console.log('Button clicked:', event.target);
 });
+
+// With options
+const touchButtons = document.querySelectorAll('.touch-btn');
+const touchUnsub = on(touchButtons, 'touchstart', (event) => {
+  console.log('Touch started');
+}, { passive: true });
+
+// Cleanup
+unsub(); // Removes click listeners
+touchUnsub(); // Removes touch listeners
 ```
 
 ### Remix Bridge Functions
