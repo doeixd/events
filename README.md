@@ -1994,11 +1994,13 @@ import { createActor, createEvent } from '@doeixd/events';
 const counterActor = createActor(
   { count: 0 },
   (context) => {
-    const [, increment] = createEvent((data) => {
+    const [incrementHandler, increment] = createEvent();
+    incrementHandler((data) => {
       if (typeof data === 'symbol' || data === 'dummy') return;
       context.count++;
     });
-    const [, decrement] = createEvent((data) => {
+    const [decrementHandler, decrement] = createEvent();
+    decrementHandler((data) => {
       if (typeof data === 'symbol' || data === 'dummy') return;
       context.count--;
     });
@@ -2034,7 +2036,8 @@ import { createActor, select, createEvent } from '@doeixd/events';
 const authActor = createActor(
   { isLoggedIn: false },
   (context) => {
-    const [, login] = createEvent((data) => {
+    const [loginHandler, login] = createEvent();
+    loginHandler((data) => {
       if (typeof data === 'symbol' || data === 'dummy') return;
       context.isLoggedIn = true;
     });
@@ -2045,7 +2048,8 @@ const authActor = createActor(
 const cartActor = createActor(
   { items: [] as string[] },
   (context) => {
-    const [, addItem] = createEvent((item) => {
+    const [addItemHandler, addItem] = createEvent<string>();
+    addItemHandler((item) => {
       if (typeof item === 'symbol' || item === 'dummy') return;
       context.items.push(item);
     });
@@ -2105,7 +2109,8 @@ const loggingEffect = (newContext, oldContext) => {
 const actor = createActor(
   { count: 0 },
   (context) => {
-    const [, increment] = createEvent((data) => {
+    const [incrementHandler, increment] = createEvent();
+    incrementHandler((data) => {
       if (typeof data === 'symbol' || data === 'dummy') return;
       context.count++;
     });

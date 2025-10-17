@@ -67,14 +67,26 @@ Operators are the knives, strainers, and sous-vide machines of our kitchen. They
 
 **Example 1: Perfecting the search input.**
 ```typescript
-import { dom, debounce, map, filter } from '@doeixd/events/operators';
+import { dom, debounce, createOperator } from '@doeixd/events/operators';
+
+// Define custom operators
+const filter = <T>(predicate: (data: T) => boolean) =>
+  createOperator<T>((data, emit, halt) => {
+    if (predicate(data)) emit(data);
+    else halt();
+  });
+
+const map = <T, R>(transformFn: (data: T) => R) =>
+  createOperator<T>((data, emit) => {
+    emit(transformFn(data));
+  });
 
 const onRawInput = dom.input(searchInput);
 
 // A pipeline of operators preparing the raw input stream
-const onSearchQuery = filter(query => query.length > 2)( // 3. Only search for meaningful queries
-                      map(event => event.target.value)(    // 2. Extract just the string value
-                      debounce(300)(onRawInput)));         // 1. Wait for the user to pause typing
+const onSearchQuery = filter((query: string) => query.length > 2)( // 3. Only search for meaningful queries
+                       map((event: Event) => (event.target as HTMLInputElement).value)(    // 2. Extract just the string value
+                       debounce(300)(onRawInput)));         // 1. Wait for the user to pause typing
 
 onSearchQuery(query => {
   // `query` is a perfectly prepared, debounced string, ready for the API.
@@ -248,15 +260,16 @@ An actor is a self-contained, stateful object. It bundles its own internal, muta
 const cartActor = createActor(
   { items: [], total: 0 },
   (context) => { // `context` is the actor's private, mutable state
-    const [onAdd, emitAdd] = createEvent<{ id: string; price: number }>();
-    
-    onAdd(item => {
+    const [addItemHandler, addItem] = createEvent<{ id: string; price: number }>();
+
+    addItemHandler(item => {
+      if (typeof item === 'symbol' || item === 'dummy') return;
       context.items.push(item);
       context.total += item.price;
     });
 
     // Expose the actor's public "control panel"
-    return { addItem: emitAdd };
+    return { addItem };
   }
 );
 
@@ -270,11 +283,12 @@ This actor manages the connection state and encapsulates the side-effects of sen
 const socketActor = createActor(
   { status: 'disconnected', socket: null as WebSocket | null },
   (context) => {
-    const [onConnect, emitConnect] = createEvent<string>();
-    const [onSend, emitSend] = createEvent<any>();
-    const [onDisconnect, emitDisconnect] = createEvent();
+    const [connectHandler, connect] = createEvent<string>();
+    const [sendHandler, send] = createEvent<any>();
+    const [disconnectHandler, disconnect] = createEvent();
 
-    onConnect(url => {
+    connectHandler(url => {
+      if (typeof url === 'symbol' || url === 'dummy') return;
       if (context.socket) return;
       context.socket = new WebSocket(url);
       context.status = 'connecting';
@@ -285,17 +299,18 @@ const socketActor = createActor(
       };
     });
 
-    onSend(data => {
+    sendHandler(data => {
+      if (typeof data === 'symbol' || data === 'dummy') return;
       if (context.status === 'connected') {
         context.socket.send(JSON.stringify(data));
       }
     });
 
-    onDisconnect(() => {
+    disconnectHandler(() => {
       context.socket?.close();
     });
 
-    return { connect: emitConnect, send: emitSend, disconnect: emitDisconnect };
+    return { connect, send, disconnect };
   }
 );
 ```

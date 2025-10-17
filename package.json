@@ -52,7 +52,10 @@
     "interaction",
     "gesture",
     "ui-events",
-    "user-interaction"
+    "user-interaction",
+    "@remix-run/events",
+    "remix-events",
+    "solid-events"
   ],
   "devDependencies": {
     "@types/node": "^22.10.2",
