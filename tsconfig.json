@@ -3,7 +3,7 @@
   "include": ["src", "types"],
   "compilerOptions": {
     "module": "ESNext",
-    "lib": ["ESNext", "dom"],
+    "lib": ["ESNext", "dom", "esnext.disposable"],
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,

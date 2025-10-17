@@ -16,6 +16,7 @@
  */
 
 import { Handler, createSubject as createSubj, type Subject, type Unsubscribe, DUMMY } from './main';
+import { createSubscriptionStack } from './stack';
 
 /* -------------------------------------------------------------------------- */
 /*                             Renamed Existing                               */
@@ -136,13 +137,36 @@ export function createTopic<T extends any[]>(
   ...handlers: Handler<T[number]>[]
 ): Handler<T[number]> {
   return ((cb) => {
-    const unsubs: Unsubscribe[] = [];
+    // Use our new, environment-agnostic factory.
+    const stack = createSubscriptionStack();
     for (const h of handlers) {
       // @ts-ignore
-      unsubs.push(h(cb));
+      stack.defer(h(cb));
     }
-    return () => unsubs.forEach((u) => u());
+    return () => stack.dispose();
   }) as Handler<T[number]>;
+}
+
+/**
+ * Combines multiple handlers into one that emits arrays of latest values.
+ */
+export function combineLatest<T>(
+  ...handlers: Handler<T>[]
+): Handler<T[]> {
+  const values: Partial<T>[] = [];
+  return ((cb) => {
+    // Use our new, environment-agnostic factory.
+    const stack = createSubscriptionStack();
+    handlers.forEach((h, i) =>
+      stack.defer(
+        h((v) => {
+          values[i] = v;
+          if (values.every((val) => val !== undefined)) cb([...values] as T[]);
+        })
+      )
+    );
+    return () => stack.dispose();
+  }) as Handler<T[]>;
 }
 
 /**
@@ -185,20 +209,6 @@ export function createPartition<T>(
  * combined(([msg, num]) => console.log(msg, num));
  * e1('hello'); e2(42); // Logs: hello 42
  */
-export function combineLatest<T>(
-  ...handlers: Handler<T>[]
-): Handler<T[]> {
-  const values: Partial<T>[] = [];
-  return ((cb) => {
-    const unsubs = handlers.map((h, i) =>
-      h((v) => {
-        values[i] = v;
-        if (values.every((val) => val !== undefined)) cb([...values] as T[]);
-      })
-    );
-    return () => unsubs.forEach((u) => u());
-  }) as Handler<T[]>;
-}
 
 /* -------------------------------------------------------------------------- */
 /*                                Exports                                      */

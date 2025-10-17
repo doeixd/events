@@ -254,6 +254,8 @@ cd packages/react && npm publish
 ```
 
 ### tsconfig.json (Main)
+The root `tsconfig.json` includes `"esnext.disposable"` in the `"lib"` array to provide **type-level support** for the `DisposableStack` API. The library uses this for type safety and automatically provides a **runtime fallback** for environments where it's not available.
+
 ```json
 {
   "extends": "@tsconfig/node16/tsconfig.json",

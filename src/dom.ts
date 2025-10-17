@@ -16,6 +16,7 @@
  */
 
 import { HaltSymbol, Handler, Subject, Unsubscribe } from './main';
+import { createSubscriptionStack } from './stack';
 
 /* -------------------------------------------------------------------------- */
 /*                                Base DOM Helpers                             */
@@ -213,12 +214,13 @@ export function on<E extends Element>(
   handler: (ev: HTMLElementEventMap[typeof event]) => void,
   options?: { signal?: AbortSignal }
 ): Unsubscribe {
-  const unsubs: Unsubscribe[] = [];
+  // Use our new, environment-agnostic factory.
+  const stack = createSubscriptionStack();
   for (const el of Array.from(elements)) {
     const h = fromDomEvent(el, event, options)(handler);
-    unsubs.push(h as Unsubscribe);
+    stack.defer(h as Unsubscribe);
   }
-  return () => unsubs.forEach((u) => u());
+  return () => stack.dispose();
 }
 
 

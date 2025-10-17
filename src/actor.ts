@@ -1,4 +1,5 @@
 import { createSubject, Subject, Emitter } from './index';
+import { createSubscriptionStack } from './stack';
 
 /**
  * A map of method names to their corresponding Emitter functions. This is the
@@ -202,15 +203,14 @@ export function select<T>(
   projection: () => T,
 ): Subject<T> {
   const derivedSubject = createSubject(projection());
-
   const update = () => derivedSubject(projection());
-  
-  // Subscribe to all source actors and store the unsubscribe functions.
-  const unsubs = sources.map(source => source.subscribe(update));
 
-  // Enhance the subject with a `dispose` method to clean up all subscriptions.
+  // Use our new, environment-agnostic factory.
+  const stack = createSubscriptionStack();
+  sources.forEach(source => stack.defer(source.subscribe(update)));
+
   const enhancedSubject = derivedSubject as Subject<T> & { dispose: () => void };
-  enhancedSubject.dispose = () => unsubs.forEach(u => u());
+  enhancedSubject.dispose = () => stack.dispose();
 
   return enhancedSubject;
 }

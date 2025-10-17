@@ -96,3 +96,5 @@ export * from './operators';
 export * from './actor';
 
 export * from './reducer';
+
+export * from './disposable';
