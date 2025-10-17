@@ -1,0 +1,60 @@
+{
+  "name": "@doeixd/svelte",
+  "version": "0.0.1",
+  "description": "Svelte stores and Runes for @doeixd/events",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "runes.d.ts"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./runes": {
+      "types": "./runes.d.ts",
+      "import": "./dist/runes.svelte.mjs",
+      "require": "./dist/runes.svelte.js"
+    }
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "build": "tsc && tsc --project tsconfig.runes.json",
+    "type-check": "tsc --noEmit && tsc --project tsconfig.runes.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "svelte",
+    "runes",
+    "store",
+    "reactive",
+    "events"
+  ],
+  "peerDependencies": {
+    "svelte": ">=4.0.0",
+    "@doeixd/events": "^0.0.6"
+  },
+  "devDependencies": {
+    "svelte": "^5.0.0-next.1",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doeixd/events.git",
+    "directory": "packages/svelte"
+  },
+  "homepage": "https://github.com/doeixd/events/tree/main/packages/svelte",
+  "bugs": {
+    "url": "https://github.com/doeixd/events/issues"
+  },
+  "author": "Patrick Glenn",
+  "publishConfig": {
+    "access": "public"
+  }
+}

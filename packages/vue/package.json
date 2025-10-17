@@ -1,0 +1,47 @@
+{
+  "name": "@doeixd/vue",
+  "version": "0.0.1",
+  "description": "Vue Composables for @doeixd/events - seamless integration with Vue components",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "vue",
+    "composables",
+    "reactive",
+    "events",
+    "typescript"
+  ],
+  "peerDependencies": {
+    "vue": ">=3.2.0",
+    "@doeixd/events": "^0.0.6"
+  },
+  "devDependencies": {
+    "vue": "^3.4.0",
+    "typescript": "^5.7.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doeixd/events.git",
+    "directory": "packages/vue"
+  },
+  "homepage": "https://github.com/doeixd/events/tree/main/packages/vue",
+  "bugs": {
+    "url": "https://github.com/doeixd/events/issues"
+  },
+  "author": "Patrick Glenn",
+  "publishConfig": {
+    "access": "public"
+  }
+}
