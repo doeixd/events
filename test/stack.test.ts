@@ -3,7 +3,7 @@ import { createTopic, createEvent } from '../src/index';
 
 // This test suite relies on the presence of DisposableStack.
 // We can use `vi.skipIf` to only run it in compatible environments.
-const hasDisposableStack = typeof DisposableStack === 'function';
+const hasDisposableStack = typeof (globalThis as any).DisposableStack === 'function';
 
 describe('Internal Robustness with DisposableStack', () => {
   it.skipIf(!hasDisposableStack)('createTopic runs all unsubscribe functions even if one throws', () => {
