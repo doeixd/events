@@ -1929,15 +1929,24 @@ const loading = (store as any).dispatch.start();
 const success = (loading as any).dispatch.finish('Done');
 ```
 
-## 🛡️ Robustness & Compatibility
+## 🛡️ Subscription Management & Disposable Resources
 
-The library employs advanced internal patterns for maximum reliability:
+The library features a robust internal subscription system for reliable resource management:
 
-### Subscription Management
-- **Automatic Cleanup**: All subscription combinators (`createTopic`, `combineLatest`, `select`, `on`) use a unified subscription stack for proper resource management
-- **Error Resilience**: Leverages `DisposableStack` in modern environments for superior error handling during cleanup operations
-- **Backwards Compatibility**: Provides a seamless array-based fallback for older JavaScript environments, ensuring universal compatibility
-- **Type Safety**: Full TypeScript support with runtime feature detection
+### DisposableStack Integration
+- **Modern Environments**: Automatically uses the native `DisposableStack` API for enhanced error handling and cleanup reliability
+- **Error Suppression**: In modern runtimes, errors during unsubscription are properly suppressed using `SuppressedError`, ensuring all cleanup functions execute
+- **Performance**: Leverages optimized native implementations where available
+
+### Backwards-Compatible Fallback
+- **Universal Support**: Provides a custom array-based subscription stack for environments without `DisposableStack`
+- **Graceful Degradation**: Maintains full functionality with console logging for errors in fallback mode
+- **Zero Configuration**: Runtime detection requires no user setup
+
+### Unified Subscription Stack
+- **Consistent API**: All combinators (`createTopic`, `combineLatest`, `select`, `on`) use the same internal stack abstraction
+- **Type Safety**: Full TypeScript support with compile-time guarantees
+- **Resource Safety**: Ensures proper cleanup even when individual unsubscribe functions throw errors
 
 ## 🙏 Acknowledgments
 
