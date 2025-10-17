@@ -15,7 +15,7 @@
  * const data = createAsyncSubject(() => fetchData(), updateHandler);
  */
 
-import { Handler, createSubject as createSubj, type Subject, type Unsubscribe, DUMMY } from './main';
+import { Handler, createSubject as createSubj, type Subject, DUMMY } from './main';
 import { createSubscriptionStack } from './stack';
 
 /* -------------------------------------------------------------------------- */
