@@ -12,7 +12,21 @@ import {
   map,
   filter,
   reduce,
-  sink
+  sink,
+  createAsyncSubject,
+  createSubjectStore,
+  createTopic,
+  createPartition,
+  fromDomEvent,
+  dom,
+  subjectProperty,
+  toEventDescriptor,
+  subjectToEventDescriptor,
+  batch,
+  combineLatest,
+  fromEmitterEvent,
+  subjectFromEvent,
+  on
 } from '../src/index';
 
 describe('@doeixd/events', () => {
@@ -1902,17 +1916,15 @@ describe('DOM Utilities', () => {
 
       it('should handle consumer errors gracefully', () => {
         const [onEvent, emitEvent] = createEvent<string>();
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const errorSink = sink((message: string) => {
           throw new Error('Consumer error');
         })(onEvent);
 
-        emitEvent('Hello');
-
-        expect(consoleSpy).toHaveBeenCalledWith('Sink consumer error:', expect.any(Error));
-
-        consoleSpy.mockRestore();
+        // Should not throw when consumer errors occur
+        expect(() => {
+          emitEvent('Hello');
+        }).not.toThrow();
       });
 
       it('should respect abort signals', async () => {

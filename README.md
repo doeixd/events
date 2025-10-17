@@ -21,7 +21,7 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 - [📖 Advanced Examples](#-advanced-examples)
 - [🏗️ Complete API Reference](#️-complete-api-reference)
 - [🔗 EventEmitter Integration](#-eventemitter-integration)
-- [🔧 Handler Operators](#-handler-operators)
+- [🔧 Handler Operators](docs/operators.md)
 - [🎭 Actor System](#-actor-system)
 
 <br />
@@ -1957,19 +1957,9 @@ reactive.data((payload) => console.log(payload));
 
 ## 🔧 Handler Operators
 
-Building on the EventEmitter integration, `@doeixd/events` now includes pipeable handler operators for creating reusable, stateful interactions:
+RxJS-style operators for event stream transformation. These operators provide powerful, composable tools for processing event data in a functional programming style.
 
-```typescript
-import { dom } from '@doeixd/events';
-import { doubleClick } from '@doeixd/events/operators';
-
-const onButtonClick = dom.click(button);
-const onButtonDoubleClick = doubleClick(500)(onButtonClick); // Pipe through operator
-
-onButtonDoubleClick(() => console.log('Double click detected!'));
-```
-
-Handler operators are functions that take a `Handler` and return a new `Handler`, enabling composable, reusable event logic similar to RxJS operators.
+📚 **[Operators Guide](docs/operators.md)** - Comprehensive documentation with examples, best practices, and API reference.
 
 <br />
 

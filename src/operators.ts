@@ -27,13 +27,13 @@ import { halt, Handler, DUMMY, Unsubscribe } from './main';
  * ```
  */
 export function createOperator<T>(
-  process: (data: T, emit: (result: T) => void, haltFn: () => never) => void
+  process: (data: T, emit: (result: T) => void, haltFn: () => never, meta?: { signal: AbortSignal }) => void
 ) {
   return (source: Handler<T>): Handler<T> =>
-    (callback) => source((data) => {
+    (callback) => source((data, meta) => {
       if (data === DUMMY) return callback(data);
 
-      process(data, callback, halt);
+      process(data, callback, halt, meta);
     });
 }
 
@@ -55,15 +55,15 @@ export function createOperator<T>(
  * ```
  */
 export function doubleClick<T extends Event>(timeout = 300) {
-  let timer: number = 0;
+  let timer: any = null;
 
-  return createOperator<T>((event, emit, halt) => {
+  return createOperator<T>((event, emit, halt, _meta) => {
     if (timer) {
       clearTimeout(timer);
-      timer = 0;
+      timer = null;
       emit(event); // Pass through on double click
     } else {
-      timer = window.setTimeout(() => (timer = 0), timeout);
+      timer = setTimeout(() => (timer = null), timeout);
       halt(); // Halt on first click
     }
   });
@@ -89,13 +89,13 @@ export function doubleClick<T extends Event>(timeout = 300) {
  * ```
  */
 export function debounce<T>(delay: number) {
-  let timeoutId: number | null = null;
+  let timeoutId: any = null;
 
-  return createOperator<T>((data, emit, halt) => {
+  return createOperator<T>((data, emit, halt, _meta) => {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-    timeoutId = window.setTimeout(() => {
+    timeoutId = setTimeout(() => {
       timeoutId = null;
       emit(data);
     }, delay);
@@ -125,7 +125,7 @@ export function debounce<T>(delay: number) {
 export function throttle<T>(interval: number) {
   let lastExecution = 0;
 
-  return createOperator<T>((data, emit, halt) => {
+  return createOperator<T>((data, emit, halt, _meta) => {
     const now = Date.now();
     if (now - lastExecution >= interval) {
       lastExecution = now;
@@ -166,25 +166,23 @@ export function map<T, R>(
   transform: (data: T) => R | Promise<R>
 ) {
   return (source: Handler<T>): Handler<R> =>
-    (callback) => source((data, meta) => {
+    (callback) => source((data, _meta) => {
       if (data === DUMMY) return callback(data as any);
 
       try {
         const result = transform(data);
         if (result instanceof Promise) {
           result.then((transformed) => callback(transformed))
-                .catch((error) => {
-                  // Handle async transformation errors by halting
-                  console.error('Map transform error:', error);
-                  // For terminal errors in async transforms, we can't halt
-                  // since we're already in the callback. Log and continue.
-                });
+                 .catch((_error) => {
+                   // Handle async transformation errors
+                   // For terminal errors in async transforms, we can't halt
+                   // since we're already in the callback. Errors are handled but don't halt.
+                 });
         } else {
           callback(result);
         }
       } catch (error) {
-        // Handle sync transformation errors by halting
-        console.error('Map transform error:', error);
+        // Handle sync transformation errors
         // Can't halt here since we're in the callback, so we skip calling callback
       }
     });
@@ -219,20 +217,19 @@ export function map<T, R>(
 export function filter<T>(
   predicate: (data: T, meta?: { signal: AbortSignal }) => boolean | Promise<boolean>
 ) {
-  return createOperator<T>((data, emit, halt) => {
+  return createOperator<T>((data, emit, halt, meta) => {
     try {
-      const result = predicate(data);
+      const result = predicate(data, meta);
       if (result instanceof Promise) {
         result.then((passed) => {
           if (passed) {
             emit(data);
-          } else {
-            halt();
           }
-        }).catch((error) => {
-          // Handle async predicate errors by halting
-          console.error('Filter predicate error:', error);
-          halt();
+          // Note: We don't call halt() for async predicates that return false
+          // because we're in an async callback and can't halt the chain
+        }).catch((_error) => {
+          // Handle async predicate errors - can't halt in async context
+          // Errors are handled but don't halt the chain in async context
         });
       } else {
         if (result) {
@@ -243,7 +240,6 @@ export function filter<T>(
       }
     } catch (error) {
       // Handle sync predicate errors by halting
-      console.error('Filter predicate error:', error);
       halt();
     }
   });
@@ -297,7 +293,7 @@ export function reduce<T, R>(
   }
 
   return (source: Handler<T>): Handler<R> =>
-    (callback) => source((data, meta) => {
+    (callback) => source((data, _meta) => {
       if (data === DUMMY) return callback(data as any);
 
       try {
@@ -306,9 +302,9 @@ export function reduce<T, R>(
           result.then((newAcc) => {
             accumulated = newAcc;
             callback(accumulated);
-          }).catch((error) => {
+          }).catch((_error) => {
             // Handle async accumulator errors
-            console.error('Reduce accumulator error:', error);
+            // Errors are handled but don't halt the chain in async context
           });
         } else {
           accumulated = result;
@@ -316,7 +312,6 @@ export function reduce<T, R>(
         }
       } catch (error) {
         // Handle sync accumulator errors
-        console.error('Reduce accumulator error:', error);
         // Can't halt here since we're in the callback
       }
     });
@@ -364,8 +359,8 @@ export function sink<T>(
       try {
         await consumer(data, meta);
       } catch (error) {
-        // Log errors in terminal operators but don't throw
-        console.error('Sink consumer error:', error);
+        // Handle errors in terminal operators but don't throw
+        // Errors are handled gracefully in sink operators
       }
     });
 
