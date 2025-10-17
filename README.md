@@ -152,7 +152,7 @@ user.subscribe((newUser) => {
 
 ## 🔄 Remix Events Integration
 
-`@doeixd/events` is designed as a powerful companion to the low-level `@remix-run/events` system. The two libraries work together to provide a complete, composable, and reactive event handling solution.
+`@doeixd/events` is designed as a powerful companion to the low-level [`@remix-run/events`](https://www.npmjs.com/package/@remix-run/events) system. The two libraries work together to provide a complete, composable, and reactive event handling solution.
 
 You can think of their roles as complementary:
 -   **`@remix-run/events`** is the **engine**. It provides the core mechanism for attaching event listeners (`events()`) and encapsulating stateful logic into reusable, higher-level **Interactions** (like `press` or `outerPress`). It manages the *lifecycle* of event handling.
@@ -385,7 +385,7 @@ events(myElement, [
 
 ## Declarative APIs Inspired by Solid-Events
 
-The core architecture and API of `@doeixd/events` are heavily inspired by the excellent [`solid-events`](https://github.com/solidjs-community/solid-events) library. The goal is to take the powerful, declarative patterns for event composition and state derivation and make them available in a **framework-agnostic** package that can be used in any JavaScript environment.
+The core architecture and API of `@doeixd/events` are heavily inspired by the excellent [`solid-events`](https://github.com/devagrawal09/solid-events/blob/master/README.md) library. The goal is to take the powerful, declarative patterns for event composition and state derivation and make them available in a **framework-agnostic** package that can be used in any JavaScript environment.
 
 If you are familiar with `solid-events`, you will find the API to be almost identical, enabling you to build complex, predictable logic by defining how state reacts to events.
 
