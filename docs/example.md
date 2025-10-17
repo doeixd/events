@@ -383,3 +383,333 @@ The fact that this complex code can be converted by only changing an import stat
     *   If the drag-and-drop logic became stateful enough (e.g., needing to track permissions or async validation), it could be encapsulated in a `createActor` for better organization.
 
 By making this simple switch, you lose nothing in terms of functionality or developer experience, but you gain a more powerful, flexible, and portable foundation for your application's interactive logic.
+
+### 1. Feature: Double-Click to Edit a Note Title
+
+The current `Column` component uses an `onBlur` event on an `<input>` to save a renamed title. Let's enhance the `Note` component with a more intuitive "double-click to edit" feature for its content.
+
+#### Before: Manual Timers and State Flags
+
+Without the `doubleClick` operator, you would have to manage timers and state manually, which is verbose and prone to bugs:
+
+```typescript
+// Conceptual manual implementation (what we're avoiding)
+let clickCount = 0;
+let timer;
+
+noteElement.addEventListener('click', () => {
+  clickCount++;
+  if (clickCount === 1) {
+    timer = setTimeout(() => {
+      clickCount = 0; // Reset after a delay
+    }, 500);
+  } else if (clickCount === 2) {
+    clearTimeout(timer);
+    clickCount = 0;
+    // --- Start editing logic here ---
+  }
+});
+```
+This logic is messy and has to be written for every component that needs it.
+
+#### After: Using the `doubleClick` Operator
+
+The `doubleClick` operator encapsulates all that timer logic into a single, declarative function.
+
+**Implementation in the `Note` component:**
+
+```typescript
+// src/components/Note.tsx
+
+import { createSignal, Show, onMount } from "solid-js";
+import { dom, doubleClick } from "@doeixd/events"; 
+// ... other imports
+
+export function Note(props: { note: Note; ... }) {
+  const { emitDeleteNote, emitEditNote } = useBoardActions();
+  
+  // State to control the editing UI
+  const [isEditing, setIsEditing] = createSignal(false);
+  
+  let noteCard: HTMLDivElement | undefined;
+  let editInput: HTMLTextAreaElement | undefined;
+
+  // This setup runs once when the component is mounted
+  onMount(() => {
+    // 1. Create a raw stream of click events on the note's main element.
+    const onNoteClick = dom.click(noteCard!);
+
+    // 2. Apply the doubleClick operator. It will only let an event pass through
+    //    if it's the second click within 500ms. All single clicks are halted.
+    const onNoteDoubleClick = doubleClick(500)(onNoteClick);
+
+    // 3. Subscribe to the final, debounced event stream.
+    onNoteDoubleClick(() => {
+      setIsEditing(true);
+      // Focus the input when editing starts
+      editInput?.focus(); 
+    });
+  });
+
+  const saveAndExit = () => {
+    // Use the existing action to save the note
+    if (editInput && editInput.value !== props.note.body) {
+      emitEditNote([props.note.id, editInput.value, new Date().getTime()]);
+    }
+    setIsEditing(false);
+  };
+
+  return (
+    <div ref={noteCard} /* ... other props */ >
+      {/* ... drag handle and other elements */}
+      
+      <Show 
+        when={isEditing()}
+        fallback={<p class="note-body">{props.note.body}</p>}
+      >
+        <textarea
+          ref={editInput}
+          class="note-textarea"
+          onBlur={saveAndExit}
+        >
+          {props.note.body}
+        </textarea>
+      </Show>
+
+      {/* ... delete button */}
+    </div>
+  );
+}
+```
+
+**Key Benefits:**
+
+*   **Declarative**: The logic reads like a sentence: "on double-click of the note, start editing."
+*   **Encapsulation**: The complex timer management is completely hidden inside the reusable `doubleClick` operator.
+*   **Maintainability**: The component's code is cleaner and focused on *what* should happen, not *how* to detect the double-click.
+
+---
+
+### 2. Feature: Swipe-to-Delete a Note on Mobile
+
+Clicking a small trash icon can be difficult on mobile. A "swipe left" gesture is a much more common and user-friendly pattern.
+
+#### Before: A Tangle of Touch Event Listeners
+
+A manual implementation would require adding `touchstart`, `touchmove`, and `touchend` listeners, tracking coordinates, calculating deltas, and managing state to see if a swipe threshold was met. This is a lot of complex, imperative code inside the `Note` component.
+
+#### After: Using `createInteraction` to Build a Reusable Gesture
+
+We can build a high-level, semantic `swipeLeft` interaction once and then use it declaratively anywhere in our app.
+
+**Step 1: Create the reusable interaction (e.g., in `src/interactions.ts`)**
+
+```typescript
+// src/interactions.ts
+
+import { createInteraction, dom, createSubscriptionStack } from "@doeixd/events";
+
+// Create a high-level 'swipeleft' interaction from low-level touch events.
+export const swipeLeft = createInteraction<Element, { distance: number }>(
+  'swipeleft',
+  ({ target, dispatch }) => {
+    let startX = 0;
+    let isSwiping = false;
+    const SWIPE_THRESHOLD = -50; // Must move at least 50px to the left
+
+    // Use a subscription stack for robust cleanup. [cite: src/stack.ts]
+    const stack = createSubscriptionStack();
+
+    stack.defer(dom.touchstart(target)(e => {
+      startX = e.touches[0].clientX;
+    }));
+
+    stack.defer(dom.touchmove(target)(e => {
+      const deltaX = e.touches[0].clientX - startX;
+      // We only care about swipes that are moving left.
+      if (deltaX < SWIPE_THRESHOLD) {
+        isSwiping = true;
+        // Optionally, you could apply a transform style here for visual feedback.
+      }
+    }));
+
+    stack.defer(dom.touchend(target)(e => {
+      if (isSwiping) {
+        const finalDeltaX = e.changedTouches[0].clientX - startX;
+        // Dispatch our new, high-level event!
+        dispatch({ detail: { distance: Math.abs(finalDeltaX) } });
+      }
+      // Reset for the next gesture.
+      startX = 0;
+      isSwiping = false;
+    }));
+
+    // The factory returns a single cleanup function.
+    return () => stack.dispose();
+  }
+);
+```
+
+**Step 2: Use the new interaction in the `Note` component**
+
+```typescript
+// src/components/Note.tsx
+
+import { useInteraction } from "@doeixd/solid"; // The SolidJS hook for the events() system
+import { swipeLeft } from "~/interactions"; // Import our new interaction
+// ... other imports
+
+export function Note(props: { note: Note; ... }) {
+  const { emitDeleteNote } = useBoardActions();
+  let noteCard: HTMLDivElement | undefined;
+
+  // Declaratively attach the swipe interaction using the idiomatic SolidJS hook.
+  useInteraction(
+    () => noteCard, // Pass the element ref as an accessor
+    () => [ // Pass descriptors as an accessor
+      swipeLeft(e => {
+        console.log(`Swiped left by ${e.detail.distance}px. Deleting note.`);
+        emitDeleteNote([props.note.id, new Date().getTime()]);
+      })
+    ]
+  );
+  
+  return (
+    <div ref={noteCard} /* ... other props */ >
+      {/* ... note content */}
+    </div>
+  );
+}
+```
+
+**Key Benefits:**
+
+*   **Encapsulation**: The messy, stateful logic of gesture detection is completely removed from the component and placed in a reusable `swipeLeft` interaction.
+*   **Declarative Use**: The `Note` component now simply declares: "when a swipe left happens on this element, call this function."
+*   **Reusability**: The `swipeLeft` interaction can now be used on any other component in your application (`Column`, `Board`, etc.) with zero code duplication.
+
+---
+
+### 3. Feature: Encapsulating Drag-and-Drop Logic
+
+The current D&D logic is spread across the `Note` and `Column` components. Each component manages its own `onDragStart`, `onDrop`, etc. This can become hard to manage, especially if you need to add global rules (e.g., you can't drop items into a "locked" column).
+
+#### Before: Decentralized and Scattered Logic
+
+Each component has its own set of `createEvent` calls for drag events, leading to duplicated logic and making it hard to manage the overall state of the drag-and-drop operation.
+
+#### After: Using `createActor` to Centralize D&D State
+
+We can create a single `dndActor` to manage the entire state of any drag-and-drop operation on the board.
+
+**Step 1: Create the Drag-and-Drop Actor (e.g., in `src/dndActor.ts`)**
+
+```typescript
+// src/dndActor.ts
+
+import { createActor, createEvent } from "@doeixd/events";
+
+// Define the actor's internal state
+interface DndState {
+  isDragging: boolean;
+  draggedId: string | null;
+  draggedType: 'Note' | 'Column' | null;
+  dropTargetId: string | null;
+  canDrop: boolean;
+}
+
+const initialState: DndState = {
+  isDragging: false,
+  draggedId: null,
+  draggedType: null,
+  dropTargetId: null,
+  canDrop: false,
+};
+
+export const dndActor = createActor(initialState, (context) => {
+  // --- Events to change the actor's state ---
+  const [dragStartHandler, dragStart] = createEvent<{ id: string, type: 'Note' | 'Column' }>();
+  const [dragEndHandler, dragEnd] = createEvent();
+  const [dragEnterTargetHandler, dragEnterTarget] = createEvent<{ id: string }>();
+  const [dragLeaveTargetHandler, dragLeaveTarget] = createEvent();
+
+  // --- Logic that mutates the actor's private context ---
+  dragStartHandler(payload => {
+    if (typeof payload === 'symbol') return;
+    context.isDragging = true;
+    context.draggedId = payload.id;
+    context.draggedType = payload.type;
+  });
+
+  dragEnterTargetHandler(payload => {
+    if (typeof payload === 'symbol') return;
+    context.dropTargetId = payload.id;
+    // Here you could add complex validation logic!
+    // e.g., const targetColumn = findColumn(payload.id);
+    // context.canDrop = targetColumn && !targetColumn.isLocked;
+    context.canDrop = true; // Simple logic for now
+  });
+
+  dragLeaveTargetHandler(() => {
+    context.dropTargetId = null;
+    context.canDrop = false;
+  });
+
+  // On drag end (or drop), reset the state completely.
+  dragEndHandler(() => {
+    Object.assign(context, initialState);
+  });
+
+  // Expose the emitters as the actor's public API.
+  return { dragStart, dragEnd, dragEnterTarget, dragLeaveTarget };
+});
+```
+
+**Step 2: Refactor the components to use the actor**
+
+The components become much simpler. They no longer manage D&D state; they just report events to the actor and react to its state.
+
+```typescript
+// src/components/Column.tsx (Simplified)
+
+import { dndActor } from "~/dndActor";
+import { useSubjectStore } from "@doeixd/solid";
+
+export function Column(props: { column: Column; ... }) {
+  const { emitMoveNote } = useBoardActions();
+  const [dndState] = useSubjectStore(dndActor);
+
+  const handleDrop = (e: DragEvent) => {
+    // Read the final state from the actor to make a decision
+    if (dndState.canDrop && dndState.draggedType === 'Note') {
+      emitMoveNote([ dndState.draggedId, props.column.id, ... ]);
+    }
+    dndActor.dragEnd(); // Tell the actor the operation is over
+  };
+
+  // Is this column the current drop target?
+  const isDropTarget = () => dndState.dropTargetId === props.column.id && dndState.canDrop;
+
+  return (
+    <div
+      class="column"
+      classList={{ "drop-target": isDropTarget() }}
+      // Components now just call the actor's methods
+      onDragStart={() => dndActor.dragStart({ id: props.column.id, type: 'Column' })}
+      onDragEnd={dndActor.dragEnd}
+      onDragEnter={() => dndActor.dragEnterTarget({ id: props.column.id })}
+      onDragLeave={dndActor.dragLeaveTarget}
+      onDrop={handleDrop}
+    >
+      {/* ... column content */}
+    </div>
+  );
+}
+```
+
+**Key Benefits:**
+
+*   **Centralized Logic**: All D&D state and rules are now in one place (`dndActor`), making it easy to understand, debug, and modify.
+*   **Simplified Components**: The `Note` and `Column` components are now much "dumber." They only know how to report user actions to the actor and how to render based on the actor's state.
+*   **Improved Testability**: The entire drag-and-drop user flow can be tested by just calling methods on the `dndActor` and asserting its state, without ever needing to simulate a real DOM event.
+*   **Scalability**: Adding complex new rules (like async validation on drop) is now trivial to implement inside the actor without touching any of the UI components.
