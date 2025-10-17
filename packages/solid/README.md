@@ -114,8 +114,7 @@ function CounterComponent() {
   );
 }
 ```
-```
-```
+
 
 ### Driving @doeixd/events from SolidJS
 
