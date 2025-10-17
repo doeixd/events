@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.17](https://github.com/doeixd/events/compare/v0.0.16...v0.0.17) (2025-10-17)
+
+
+### Bug Fixes
+
+* add readme field to package.json files ([b1f8aee](https://github.com/doeixd/events/commit/b1f8aeead2eaa63a0ce3ff6380cee1e0d5bebe86))
+
 ### [0.0.16](https://github.com/doeixd/events/compare/v0.0.15...v0.0.16) (2025-10-17)
 
 
