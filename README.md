@@ -1948,6 +1948,10 @@ The library features a robust internal subscription system for reliable resource
 - **Type Safety**: Full TypeScript support with compile-time guarantees
 - **Resource Safety**: Ensures proper cleanup even when individual unsubscribe functions throw errors
 
+### Internal Utilities
+- **`createSubscriptionStack()`**: Factory function that returns a subscription manager, using `DisposableStack` in modern environments or an array-based fallback otherwise
+- **`createSubscriptionManager()`**: Higher-level manager implementing the Disposable protocol for automatic cleanup with the `using` keyword
+
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
