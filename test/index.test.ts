@@ -1,29 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-createEvent,
-createSubject,
-halt,
-fromDomEvent,
-dom,
-subjectProperty,
-subjectFromEvent,
-on,
-toEventDescriptor,
-createTopic,
-createPartition,
-createAsyncSubject,
-createSubjectStore,
-combineLatest,
-subjectToEventDescriptor,
-batch,
-DUMMY,
-fromEmitterEvent,
-toEmitterEvent,
-adaptEmitter,
-createOperator,
-doubleClick,
-debounce,
-throttle
+  createEvent,
+  createSubject,
+  halt,
+  toEmitterEvent,
+  adaptEmitter,
+  createOperator,
+  doubleClick,
+  debounce,
+  throttle,
+  map,
+  filter,
+  reduce,
+  sink
 } from '../src/index';
 
 describe('@doeixd/events', () => {
@@ -1666,6 +1655,301 @@ describe('DOM Utilities', () => {
         actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
         expect(actualCalls).toHaveLength(2);
         expect(actualCalls[1][0]).toBe('fourth');
+      });
+    });
+
+    describe('map', () => {
+      it('should transform event data synchronously', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const doubledHandler = map((n: number) => n * 2)(onEvent);
+        const mockCallback = vi.fn();
+
+        doubledHandler(mockCallback);
+
+        emitEvent(5);
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(10);
+      });
+
+      it('should handle async transformations', async () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const asyncDoubledHandler = map(async (n: number) => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return n * 2;
+        })(onEvent);
+        const mockCallback = vi.fn();
+
+        asyncDoubledHandler(mockCallback);
+
+        emitEvent(5);
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(10);
+      });
+
+      it('should handle transformation errors by halting', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const errorHandler = map((n: number) => {
+          if (n < 0) throw new Error('Negative number');
+          return n * 2;
+        })(onEvent);
+        const mockCallback = vi.fn();
+
+        errorHandler(mockCallback);
+
+        emitEvent(5);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(10);
+
+        emitEvent(-1);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1); // Should not have increased
+      });
+
+
+    });
+
+    describe('filter', () => {
+      it('should pass through events that match predicate', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const evenNumbersHandler = filter((n: number) => n % 2 === 0)(onEvent);
+        const mockCallback = vi.fn();
+
+        evenNumbersHandler(mockCallback);
+
+        emitEvent(1);
+        emitEvent(2);
+        emitEvent(3);
+        emitEvent(4);
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe(2);
+        expect(actualCalls[1][0]).toBe(4);
+      });
+
+      it('should handle async predicates', async () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const asyncEvenHandler = filter(async (n: number) => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return n % 2 === 0;
+        })(onEvent);
+        const mockCallback = vi.fn();
+
+        asyncEvenHandler(mockCallback);
+
+        emitEvent(1);
+        emitEvent(2);
+        emitEvent(3);
+        emitEvent(4);
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe(2);
+        expect(actualCalls[1][0]).toBe(4);
+      });
+
+      it('should handle predicate errors by halting', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const errorHandler = filter((n: number) => {
+          if (n < 0) throw new Error('Negative number');
+          return n % 2 === 0;
+        })(onEvent);
+        const mockCallback = vi.fn();
+
+        errorHandler(mockCallback);
+
+        emitEvent(2);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+
+        emitEvent(-1);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1); // Should not have increased
+      });
+    });
+
+    describe('reduce', () => {
+      it('should accumulate values over time', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const sumHandler = reduce((acc: number, n: number) => acc + n, 0)(onEvent);
+        const mockCallback = vi.fn();
+
+        sumHandler(mockCallback);
+
+        emitEvent(5);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(5);
+
+        emitEvent(3);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[1][0]).toBe(8);
+
+        emitEvent(2);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(3);
+        expect(actualCalls[2][0]).toBe(10);
+      });
+
+      it('should handle async accumulators', async () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const asyncSumHandler = reduce(async (acc: number, n: number) => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return acc + n;
+        }, 0)(onEvent);
+        const mockCallback = vi.fn();
+
+        asyncSumHandler(mockCallback);
+
+        emitEvent(5);
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(5);
+
+        emitEvent(3);
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[1][0]).toBe(8);
+      });
+
+      it('should reset state on abort signal', () => {
+        const controller = new AbortController();
+        const [onEvent, emitEvent] = createEvent<number>();
+        const sumHandler = reduce((acc: number, n: number) => acc + n, 0, { signal: controller.signal })(onEvent);
+        const mockCallback = vi.fn();
+
+        sumHandler(mockCallback);
+
+        emitEvent(5);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+        expect(actualCalls[0][0]).toBe(5);
+
+        controller.abort();
+
+        emitEvent(3);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[1][0]).toBe(3); // Should have reset to initial value
+      });
+
+      it('should handle accumulator errors by halting', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const errorHandler = reduce((acc: number, n: number) => {
+          if (n < 0) throw new Error('Negative number');
+          return acc + n;
+        }, 0)(onEvent);
+        const mockCallback = vi.fn();
+
+        errorHandler(mockCallback);
+
+        emitEvent(5);
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1);
+
+        emitEvent(-1);
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(1); // Should not have increased
+      });
+    });
+
+    describe('sink', () => {
+      it('should consume events without chaining', () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const messages: string[] = [];
+
+        const logSink = sink((message: string) => {
+          messages.push(message);
+        })(onEvent);
+
+        emitEvent('Hello');
+        emitEvent('World');
+
+        expect(messages).toEqual(['Hello', 'World']);
+
+        // Cleanup
+        logSink();
+      });
+
+      it('should handle async consumers', async () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const messages: string[] = [];
+
+        const asyncLogSink = sink(async (message: string) => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          messages.push(message);
+        })(onEvent);
+
+        emitEvent('Hello');
+        emitEvent('World');
+
+        await new Promise(resolve => setTimeout(resolve, 30));
+
+        expect(messages).toEqual(['Hello', 'World']);
+      });
+
+      it('should handle consumer errors gracefully', () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const errorSink = sink((message: string) => {
+          throw new Error('Consumer error');
+        })(onEvent);
+
+        emitEvent('Hello');
+
+        expect(consoleSpy).toHaveBeenCalledWith('Sink consumer error:', expect.any(Error));
+
+        consoleSpy.mockRestore();
+      });
+
+      it('should respect abort signals', async () => {
+        const controller = new AbortController();
+        const [onEvent, emitEvent] = createEvent<string>();
+        const messages: string[] = [];
+
+        const cancellableSink = sink(async (message: string, meta) => {
+          if (meta?.signal?.aborted) return;
+          await new Promise(resolve => setTimeout(resolve, 10));
+          messages.push(message);
+        }, { signal: controller.signal })(onEvent);
+
+        emitEvent('Hello');
+        controller.abort();
+        emitEvent('World');
+
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        expect(messages).toEqual(['Hello']); // Second message should be cancelled
+      });
+
+      it('should return unsubscribe function', () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const messages: string[] = [];
+
+        const unsubscribe = sink((message: string) => {
+          messages.push(message);
+        })(onEvent);
+
+        emitEvent('Hello');
+        expect(messages).toEqual(['Hello']);
+
+        unsubscribe();
+
+        emitEvent('World');
+        expect(messages).toEqual(['Hello']); // Should not have added after unsubscribe
       });
     });
   });
