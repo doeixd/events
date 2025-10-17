@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.18](https://github.com/doeixd/events/compare/v0.0.17...v0.0.18) (2025-10-17)
+
+
+### Features
+
+* implement RxJS-style handler operators with comprehensive testing and documentation ([9a16f0d](https://github.com/doeixd/events/commit/9a16f0d1a66babd868bf50034cbf99ed30d4eaf3))
+
 ### [0.0.17](https://github.com/doeixd/events/compare/v0.0.16...v0.0.17) (2025-10-17)
 
 
