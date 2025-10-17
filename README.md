@@ -1876,6 +1876,59 @@ const actor = createActor(
 );
 ```
 
+## 🔄 Reducers
+
+The reducer system provides immutable, type-safe state management with fluent chaining and optional side effects.
+
+### `createReducer<TState, TReducers>(config: ReducerConfig<TState, TReducers>): ReducerStore<TState, TReducers>`
+
+Creates a reducer store for general-purpose state management.
+
+**Parameters:**
+- `config` - Configuration with initial state, actions map, and optional effects
+
+**Example:**
+```typescript
+import { createReducer } from '@doeixd/events';
+
+const store = createReducer({
+  initialState: { count: 0 },
+  actions: {
+    increment: (state, amount: number) => ({ count: state.count + amount }),
+    decrement: (state, amount: number) => ({ count: state.count - amount })
+  }
+});
+
+const updated = store.dispatch.increment(5).dispatch.decrement(2);
+console.log(updated()); // { count: 3 }
+```
+
+### `createGuardedReducer<TState, TActions>(config: { initialState: TState; actions: TActions }): StateGuardedReducerStore<TState, TActions>`
+
+Creates a state-guarded reducer for compile-time state machine safety.
+
+**Parameters:**
+- `config` - Configuration with initial state and actions map
+
+**Example:**
+```typescript
+import { createGuardedReducer } from '@doeixd/events';
+
+type State = { status: 'idle' } | { status: 'loading' } | { status: 'success'; data: string };
+
+const store = createGuardedReducer<State, any>({
+  initialState: { status: 'idle' },
+  actions: {
+    start: (state) => ({ status: 'loading' }),
+    finish: (state, data: string) => ({ status: 'success', data })
+  }
+});
+
+// Only valid actions are available based on current status
+const loading = (store as any).dispatch.start();
+const success = (loading as any).dispatch.finish('Done');
+```
+
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
