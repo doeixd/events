@@ -15,7 +15,7 @@ pnpm add @doeixd/react @doeixd/events
 ## Quick Start
 
 ```tsx
-import { useEvent, useSubject } from '@doeixd/react';
+import { useEvent, useSubject, useActor, useEvents, useEventReducer, useStore } from '@doeixd/react';
 import { createEvent, createSubject } from '@doeixd/events';
 
 function Counter() {
@@ -93,10 +93,152 @@ const userName = useSubjectSelector(user, (user) => user.name);
 return <div>Hello {userName}!</div>;
 ```
 
+### `useActor(actorFactory)`
+
+Hook that creates a stable, component-bound instance of a stateful actor/store and subscribes to its state.
+
+**Parameters:**
+- `actorFactory`: Factory function that creates and returns the actor instance
+
+**Returns:** Tuple `[state, actor]` where `state` is the reactive state and `actor` is the stable instance
+
+**Example:**
+```tsx
+import { useActor } from '@doeixd/react';
+import { createCounterActor } from './counterActor';
+
+function CounterComponent() {
+  const [counterState, counterActor] = useActor(createCounterActor);
+
+  return (
+    <div>
+      <p>Count: {counterState.count}</p>
+      <button onClick={() => counterActor.increment(1)}>Increment</button>
+    </div>
+  );
+}
+```
+
+### `useActorSelector(actorFactory, selector)`
+
+Optimized version of `useActor` that only re-renders when the selected part of the actor's state changes.
+
+**Parameters:**
+- `actorFactory`: Factory function that creates the actor instance
+- `selector`: Function that selects a value from the actor's state
+
+**Returns:** Selected reactive state value
+
+**Example:**
+```tsx
+import { useActorSelector } from '@doeixd/react';
+import { createUserProfileActor } from './userProfileActor';
+
+function UserNameDisplay() {
+  const userName = useActorSelector(
+    createUserProfileActor,
+    (state) => state.user.name
+  );
+
+  return <h1>{userName}</h1>;
+}
+```
+
+### `useEvents(targetRef, descriptors, enabled?)`
+
+Hook that declaratively attaches interactions and event handlers to DOM elements.
+
+**Parameters:**
+- `targetRef`: React ref object pointing to the target DOM element
+- `descriptors`: Array of event descriptors to attach
+- `enabled`: Optional boolean to enable/disable listeners (default: true)
+
+**Example:**
+```tsx
+import { useRef } from 'react';
+import { useEvents } from '@doeixd/react';
+import { press, dom } from '@doeixd/events';
+
+function InteractiveButton() {
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handlePress = () => console.log('Pressed!');
+  const handleClick = () => console.log('Clicked!');
+
+  useEvents(buttonRef, [
+    press(handlePress),
+    dom.click(handleClick)
+  ]);
+
+  return <button ref={buttonRef}>Interact</button>;
+}
+```
+
+### `useEventReducer(reducerFactory)`
+
+Hook that creates a reducer store with a familiar `[state, dispatch]` API.
+
+**Parameters:**
+- `reducerFactory`: Factory function that returns a reducer store instance
+
+**Returns:** Tuple `[state, dispatch]` where `state` is reactive and `dispatch` contains action methods
+
+**Example:**
+```tsx
+import { useEventReducer } from '@doeixd/react';
+import { createReducer } from '@doeixd/events';
+
+const counterReducer = () => createReducer({
+  initialState: { count: 0 },
+  actions: {
+    increment: (state, amount: number) => ({ count: state.count + amount }),
+    reset: (state) => ({ count: 0 }),
+  },
+});
+
+function Counter() {
+  const [state, dispatch] = useEventReducer(counterReducer);
+
+  return (
+    <div>
+      <p>Count: {state.count}</p>
+      <button onClick={() => dispatch.increment(1)}>Increment</button>
+      <button onClick={() => dispatch.reset()}>Reset</button>
+    </div>
+  );
+}
+```
+
+### `useStore(storeFactory)`
+
+Hook for using @doeixd/events stores (Reducers, Actors, etc.) in a controlled component pattern.
+
+**Parameters:**
+- `storeFactory`: Factory function that returns a store instance
+
+**Returns:** Tuple `[state, actions]` where `state` is reactive and `actions` contains store methods
+
+**Example:**
+```tsx
+import { useStore } from '@doeixd/react';
+import { createCounterActor } from './counterActor';
+
+function Counter() {
+  const [state, actions] = useStore(createCounterActor);
+
+  return (
+    <div>
+      <p>Count: {state.count}</p>
+      <button onClick={() => actions.increment()}>Increment</button>
+    </div>
+  );
+}
+```
+
 ## Advanced Example
 
 ```tsx
-import { useEvent, useSubject, useSubjectSelector } from '@doeixd/react';
+import { useEvent, useSubject, useSubjectSelector, useActor, useEvents, useEventReducer, useStore } from '@doeixd/react';
 import { createEvent, createSubject } from '@doeixd/events';
 
 function TodoApp() {

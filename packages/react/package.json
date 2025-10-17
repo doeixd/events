@@ -21,7 +21,7 @@
   ],
   "peerDependencies": {
     "react": ">=16.8.0",
-    "@doeixd/events": "^0.0.6"
+    "@doeixd/events": "^0.0.18"
   },
   "devDependencies": {
     "@types/react": "^18.0.0",

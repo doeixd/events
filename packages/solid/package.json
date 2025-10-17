@@ -26,7 +26,7 @@
   ],
   "peerDependencies": {
     "solid-js": ">=1.6.0",
-    "@doeixd/events": "^0.0.6"
+    "@doeixd/events": "^0.0.18"
   },
   "devDependencies": {
     "solid-js": "^1.8.0",

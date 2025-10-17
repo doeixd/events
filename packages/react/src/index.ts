@@ -152,8 +152,27 @@ function shallowEqual(a: any, b: any): boolean {
   return true;
 }
 
+// Export all hooks from their respective modules
+export { useActor, useActorSelector } from './actor';
+export { useEventReducer } from './reducer';
+export { useEvents } from './events';
+export { useStore } from './store';
+
+// Import them for the default export
+import { useActor, useActorSelector } from './actor';
+import { useEventReducer } from './reducer';
+import { useEvents } from './events';
+import { useStore } from './store';
+
 export default {
+  // Existing hooks
   useEvent,
   useSubject,
-  useSubjectSelector
+  useSubjectSelector,
+  // New hooks
+  useActor,
+  useActorSelector,
+  useEventReducer,
+  useEvents,
+  useStore,
 };

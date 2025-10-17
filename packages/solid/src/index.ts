@@ -9,6 +9,12 @@ import { createEffect, onCleanup, untrack, createSignal, type Accessor, type Set
 import { createStore, type SetStoreFunction, type Store } from 'solid-js/store';
 import type { Handler, Subject } from '@doeixd/events';
 
+// --- NEW ---
+export { createEvents } from './events';
+export { useActor } from './actor';
+export { useInteraction } from './interaction';
+// -----------
+
 /* -------------------------------------------------------------------------- */
 /*             Consuming @doeixd/events within SolidJS                        */
 /* -------------------------------------------------------------------------- */
@@ -254,11 +260,21 @@ export function syncSignalWithSubject<T>(
   return cleanup;
 }
 
+// --- UPDATE THE DEFAULT EXPORT ---
+import { createEvents } from './events';
+import { useActor } from './actor';
+import { useInteraction } from './interaction'; // Import for default export
+
 export default {
+  // Existing hooks
   useEvent,
   useSubject,
   useSubjectStore,
   fromSignal,
   bindSignalToSubject,
-  syncSignalWithSubject
+  syncSignalWithSubject,
+  // New hooks
+  useActor,
+  createEvents,
+  useInteraction,
 };

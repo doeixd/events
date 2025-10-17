@@ -39,7 +39,7 @@
   ],
   "peerDependencies": {
     "svelte": ">=4.0.0",
-    "@doeixd/events": "^0.0.6"
+    "@doeixd/events": "^0.0.18"
   },
   "devDependencies": {
     "svelte": "^5.0.0-next.1",

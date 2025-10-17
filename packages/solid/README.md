@@ -17,6 +17,8 @@ yarn add @doeixd/solid @doeixd/events
 This package provides powerful utilities for bridging `@doeixd/events`'s push-based event system with SolidJS's pull-based, auto-tracking reactivity. You can:
 
 - **Consume events in Solid**: Convert Handlers and Subjects into Solid signals and stores
+- **Component-owned state**: Use `useActor` for actors and reducers
+- **Attach DOM interactions**: Use `createEvents` for declarative event handling
 - **Drive events from Solid**: Create event handlers from Solid signals
 - **Bidirectional sync**: Keep signals and subjects in sync automatically
 
@@ -87,6 +89,31 @@ function UserProfile() {
   // This component will ONLY re-render when user.name changes
   return <p>User name: {user.name}</p>;
 }
+
+#### useActor
+
+Create and manage a component-owned instance of an @doeixd/events actor or reducer:
+
+```tsx
+import { useActor } from '@doeixd/solid';
+import { createCounterActor } from './counterActor';
+
+function CounterComponent() {
+  // Create and adapt the actor in one idiomatic line
+  const [state, actions] = useActor(createCounterActor);
+
+  // `state` is now a fine-grained Solid store
+  // `actions` contains stable methods like `increment`
+
+  return (
+    <div>
+      <p>Count: {state.count}</p>
+      <button onClick={() => actions.increment()}>Increment</button>
+    </div>
+  );
+}
+```
+```
 ```
 
 ### Driving @doeixd/events from SolidJS
@@ -182,6 +209,29 @@ Returns a Solid store for fine-grained reactivity on object properties.
 - **subject**: `Subject<T>` - The subject to convert (must contain an object)
 - **returns**: `[Store<T>, SetStoreFunction<T>]` - A Solid store tuple
 
+#### useActor<TState, TActions, TActor>(actorFactory)
+
+Creates and manages a component-owned instance of an @doeixd/events actor or reducer.
+
+- **actorFactory**: `() => TActor` - Factory function that creates the actor instance
+- **returns**: `[TState, TActions]` - Tuple of reactive state and stable actions
+
+#### createEvents(target, descriptors, enabled?)
+
+Declaratively attaches event handlers and interactions to DOM elements.
+
+- **target**: `Accessor<EventTarget> | EventTarget` - The target element
+- **descriptors**: `Accessor<EventDescriptor[]>` - Array of event descriptors
+- **enabled**: `Accessor<boolean>` - Optional enable/disable flag (default: true)
+
+#### useInteraction(target, descriptors, enabled?)
+
+Alias for `createEvents` providing API consistency with React.
+
+- **target**: `Accessor<EventTarget> | EventTarget` - The target element
+- **descriptors**: `Accessor<EventDescriptor[]>` - Array of event descriptors
+- **enabled**: `Accessor<boolean>` - Optional enable/disable flag (default: true)
+
 ### Driving Events
 
 #### fromSignal<T>(accessor)
@@ -206,6 +256,127 @@ Creates a two-way binding between a signal and a Subject.
 - **signal**: `[Accessor<T>, Setter<T>]` - The Solid signal tuple
 - **subject**: `Subject<T>` - The subject to sync with
 - **returns**: `() => void` - Cleanup function
+
+## Best Practices
+
+### Component-Owned State with useActor
+
+For component-local state managed by Actors or Reducers, always use `useActor`:
+
+```tsx
+import { useActor } from '@doeixd/solid';
+import { createFormStore } from './stores';
+
+function MyForm() {
+  const [state, actions] = useActor(createFormStore);
+
+  // state is a reactive Solid store
+  // actions contains stable methods
+}
+```
+
+### DOM Interactions with useInteraction
+
+For attaching event handlers and interactions to DOM elements, use `useInteraction`:
+
+```tsx
+import { createSignal } from 'solid-js';
+import { useInteraction } from '@doeixd/solid';
+import { press, dom } from '@doeixd/events';
+
+function InteractiveButton() {
+  const [buttonEl, setButtonEl] = createSignal<HTMLButtonElement>();
+
+  useInteraction(buttonEl, () => [
+    press(() => console.log('Pressed!')),
+    dom.click(() => console.log('Clicked!'))
+  ]);
+
+  return <button ref={setButtonEl}>Interact</button>;
+}
+```
+
+### External State with useSubject/useSubjectStore
+
+For subscribing to global or external state, use `useSubject` or `useSubjectStore`:
+
+```tsx
+import { useSubjectStore } from '@doeixd/solid';
+import { globalUserStore } from './stores';
+
+function UserProfile() {
+  const [user, setUser] = useSubjectStore(globalUserStore);
+
+  // Fine-grained reactivity on user.name, user.email, etc.
+  return <div>Hello {user.name}!</div>;
+}
+```
+
+### Signal-to-Events with fromSignal
+
+To push Solid reactivity into @doeixd/events pipelines, use `fromSignal`:
+
+```tsx
+import { createSignal } from 'solid-js';
+import { fromSignal, debounce } from '@doeixd/solid';
+import { createEvent } from '@doeixd/events';
+
+const [query, setQuery] = createSignal('');
+const onQueryChange = fromSignal(query);
+const onDebouncedQuery = debounce(300)(onQueryChange);
+
+// Now you can use all @doeixd/events operators!
+```
+
+## Gotchas
+
+### Accessor Dependencies in useInteraction
+
+Since `useInteraction` (and `createEvents`) accept accessors, make sure to wrap descriptors in accessors to ensure reactivity:
+
+```tsx
+// ❌ Won't react to changes in enabled state
+useInteraction(buttonEl, [press(handler)], enabled);
+
+// ✅ Will properly track enabled changes
+useInteraction(buttonEl, () => [press(handler)], () => enabled);
+```
+
+### Solid Component Body Runs Once
+
+Unlike React, Solid component functions run only once. This means you can create store instances directly in the component body:
+
+```tsx
+function MyComponent() {
+  // ✅ This is fine in Solid - runs once per component instance
+  const [state, actions] = useActor(() => createMyStore());
+
+  // ❌ Don't do this - will create a new store on every render
+  // const [state, actions] = useActor(createMyStore()); // Without factory
+}
+```
+
+### Store Instance Updates in useActor
+
+When using reducers that return new instances (like `createReducer`), `useActor` automatically handles the instance updates. The actions object remains stable:
+
+```tsx
+const [state, actions] = useActor(createReducer);
+
+// actions.increment() will work even after state changes
+// The hook internally manages instance updates
+```
+
+### Cleanup in Effects
+
+Solid's effects automatically clean up when the reactive scope ends, but manual cleanup functions are still returned for compatibility:
+
+```tsx
+const cleanup = bindSignalToSubject(mySignal, mySubject);
+
+// In Solid, this cleanup is optional since the effect will clean up automatically
+// But it's good practice to call it if you need manual control
+```
 
 ## License
 
