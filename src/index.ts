@@ -98,3 +98,37 @@ export * from './actor';
 export * from './reducer';
 
 export * from './disposable';
+
+// -- Remix Events Compatibility Layer --
+// Re-export types for convenience
+export type {
+  EventDescriptor,
+  InteractionDescriptor,
+  EventContainer,
+  EventHandler,
+  Cleanup
+} from './events-remix-types';
+
+/**
+ * The declarative event attachment system.
+ * @see {@link ./remix-attacher.ts}
+ */
+export { events } from './remix-attacher';
+
+/**
+ * The factory for creating reusable, high-level interactions.
+ * @see {@link ./interaction.ts}
+ */
+export { createInteraction } from './interaction';
+
+/**
+ * A bridge to use functional `@doeixd/events` Handlers within the declarative `events()` system.
+ * @see {@link ./remix-bridge.ts}
+ */
+export { fromHandler } from './remix-bridge';
+
+/**
+ * A built-in interaction that normalizes clicks, key presses, and taps.
+ * @see {@link ./interactions/press.ts}
+ */
+export { press } from './interactions/press';

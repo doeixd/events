@@ -1,97 +1,22 @@
-// // events-remix-types.ts
-// /**
-//  * Core types for Remix-style event integration with our library.
-//  * 
-//  * Provides type-safe definitions for EventDescriptors, EventContainers,
-//  * EventHandlers, and interactions, fully compatible with AbortSignals.
-//  */
-
-// /**
-//  * Generic event object extended to allow typed `currentTarget` and `target`.
-//  */
-// export type EventWithTargets<
-//   E = Event,
-//   ECurrentTarget = any,
-//   ETarget = any
-// > = Omit<E, 'target' | 'currentTarget'> & {
-//   target: ETarget
-//   currentTarget: ECurrentTarget
-// };
-
-// /**
-//  * Event handler function type.
-//  *
-//  * @template E - Event type
-//  * @template ECurrentTarget - currentTarget type
-//  * @template ETarget - target type
-//  */
-// export type EventHandler<
-//   E = Event,
-//   ECurrentTarget = any,
-//   ETarget = any
-// > = (event: EventWithTargets<E, ECurrentTarget, ETarget>, signal: AbortSignal) => any | Promise<any>;
-
-// /**
-//  * Standard event descriptor for a DOM or custom event.
-//  *
-//  * Use `bind()` in Remix style to create them.
-//  */
-// export interface EventDescriptor<ECurrentTarget = any> {
-//   /** Event type string (e.g., 'click', 'input') */
-//   type: string;
-
-//   /** Event handler function */
-//   handler: EventHandler<any, ECurrentTarget>;
-
-//   /** Optional: indicates custom interaction descriptor */
-//   isCustom?: boolean;
-
-//   /** Optional addEventListener options */
-//   options?: AddEventListenerOptions;
-// }
-
-// /**
-//  * Factory-based interaction descriptor for advanced custom events or gestures.
-//  */
-// export interface InteractionDescriptor<Target extends EventTarget = any> extends EventDescriptor<Target> {
-//   /** Indicates this is a custom interaction */
-//   isCustom: true;
-
-//   /** Factory function that sets up the interaction */
-//   factory: (ctx: {
-//     dispatch: (eventInit: CustomEventInit) => void;
-//     target: Target;
-//   }, options?: any) => Cleanup | Cleanup[];
-// }
-
-// /**
-//  * Function that cleans up attached event listeners.
-//  */
-// export type Cleanup = () => void;
-
-// /**
-//  * Container returned by `events(target)` in Remix style.
-//  * Provides `.on()` to attach descriptors and `.cleanup()` to remove all.
-//  */
-// export interface EventContainer {
-//   /** Add or update event descriptors */
-//   on: (events: EventDescriptor | EventDescriptor[] | undefined) => void;
-
-//   /** Remove all attached events */
-//   cleanup: () => void;
-// }
 /**
- * events-remix-types.ts
+ * @module remix-types
  *
- * Type definitions for bridging a type-safe event/subject system with
- * Remix-style events (@remix-run/events or similar).
+ * Provides the core, shared type definitions for the Remix Events compatibility layer.
+ * This includes the declarative `EventDescriptor` and the interfaces for building
+ * composable, high-level `Interaction`s.
  */
 
+import type { InteractionFactory } from './interaction';
+
+/**
+ * A function that is called to clean up an event listener or other resources.
+ * Typically returned from a subscription.
+ */
 export type Cleanup = () => void;
 
 /**
- * Generic event with targets typed separately.
- * Replaces `target` and `currentTarget` with specific types.
+ * A generic event object where the `target` and `currentTarget` properties
+ * can be strongly typed, which is essential for type-safe event handlers.
  */
 export type EventWithTargets<
   E = Event,
@@ -103,8 +28,10 @@ export type EventWithTargets<
 };
 
 /**
- * Handler function for Remix-style events.
- * Receives the event and an AbortSignal for cleanup.
+ * The signature for an event handler function within the Remix-style system.
+ * It receives the typed event object and an `AbortSignal` for re-entry management,
+ * ensuring that an async handler is cancelled if the same event is fired again
+ * before the handler completes.
  */
 export type EventHandler<
   E = Event,
@@ -113,84 +40,45 @@ export type EventHandler<
 > = (event: EventWithTargets<E, ECurrentTarget, ETarget>, signal: AbortSignal) => any | Promise<any>;
 
 /**
- * Event descriptor for attaching to a target.
+ * A declarative description of an event listener to be attached to a target.
+ * This serves as the primary data structure for the `events()` attacher function.
  */
 export interface EventDescriptor<ECurrentTarget = any> {
+  /** The name of the event (e.g., 'click', 'keydown', or a custom event name). */
   type: string;
+  /** The function to execute when the event is triggered. */
   handler: EventHandler<any, ECurrentTarget>;
+  /** A flag indicating whether this is a standard DOM event or a custom interaction. */
   isCustom?: boolean;
+  /** Standard `addEventListener` options. */
   options?: AddEventListenerOptions;
 }
 
 /**
- * Special descriptor for custom interactions.
- * Used internally for `InteractionDescriptorFactory`.
+ * A specialized `EventDescriptor` for a high-level, custom interaction.
+ * It includes the `factory` function that implements the interaction's logic.
  */
 export interface InteractionDescriptor<Target extends EventTarget = any> extends EventDescriptor<Target> {
   isCustom: true;
-  /**
-   * Factory that returns cleanup function(s).
-   */
-  factory: InteractionDescriptorFactory<Target>;
+  /** The factory function that sets up the low-level listeners for this interaction. */
+  factory: InteractionFactory<Target>;
+  /** The options object passed to the factory function during setup. */
   factoryOptions?: any;
 }
 
 /**
- * Factory signature for creating custom interactions.
- */
-export type InteractionDescriptorFactory<Target extends EventTarget = any> = (ctx: {
-  target: Target;
-  dispatch: (event: CustomEvent) => void;
-}, opts?: any) => Cleanup | Cleanup[] | void;
-
-/**
- * Container returned by `events(target)`.
- * Allows dynamic updates and cleanup.
+ * An object that manages a dynamic set of event listeners on a target.
+ * Returned by `events(target)`.
  */
 export interface EventContainer {
-  on: (events: EventDescriptor | EventDescriptor[] | undefined) => void;
+  /**
+   * Attaches or updates the event listeners on the target.
+   * This will clean up any previously attached listeners and apply the new set.
+   * @param descriptors A single `EventDescriptor` or an array of them.
+   */
+  on: (descriptors: EventDescriptor | EventDescriptor[] | undefined) => void;
+  /**
+   * Removes all event listeners managed by this container.
+   */
   cleanup: () => void;
-}
-
-/**
- * Union of DOM events and custom events.
- */
-export type AnyEvent = Event | CustomEvent<any>;
-
-/**
- * Utility to infer the type of a DOM event for a given element and event name.
- */
-export type DOMEventType<
-K extends keyof HTMLElementEventMap
-> = HTMLElementEventMap[K];
-
-/**
- * Optional platform-specific extensions.
- */
-export interface EventDescriptorExtensions {
-  signal?: AbortSignal;
-  capture?: boolean;
-  passive?: boolean;
-}
-
-/**
- * Type guard for distinguishing custom interactions from normal events.
- */
-export function isInteractionDescriptor(descriptor: EventDescriptor): descriptor is InteractionDescriptor {
-  return descriptor.isCustom === true;
-}
-
-/**
- * Helper: split descriptors into custom vs standard.
- */
-export function splitDescriptors<T extends EventTarget>(
-  descriptors: EventDescriptor<T>[]
-): { custom: InteractionDescriptor<T>[]; standard: EventDescriptor<T>[] } {
-  const custom: InteractionDescriptor<T>[] = [];
-  const standard: EventDescriptor<T>[] = [];
-  for (const d of descriptors) {
-    if (isInteractionDescriptor(d)) custom.push(d);
-    else standard.push(d);
-  }
-  return { custom, standard };
 }

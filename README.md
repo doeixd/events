@@ -257,6 +257,111 @@ This example shows the power of the combination:
 -   **Remix's `createInteraction`** encapsulates the logic and provides the `dispatch` mechanism.
 -   **`@doeixd/events`** provides the declarative tools (`createEvent`, `halt`, chaining) to implement the complex timing logic cleanly.
 
+### Declarative Attachment
+
+The `events()` function creates a managed container for attaching listeners to any `EventTarget`. You describe your listeners as an array of `EventDescriptor` objects.
+
+```typescript
+import { events, dom, press } from '@doeixd/events';
+
+const button = document.getElementById('my-button');
+
+// 1. Create an event container for the element
+const buttonEvents = events(button);
+
+// 2. Declaratively attach a set of listeners
+buttonEvents.on([
+  // Attach a standard DOM event listener
+  dom.click(event => {
+    console.log('Button was clicked!');
+  }),
+
+  // Attach a high-level, built-in interaction
+  press(event => {
+    // This fires for mouse clicks, touch taps, and Enter/Space key presses
+    console.log(`Button was "pressed" via a ${event.detail.originalEvent.type} event.`);
+  })
+]);
+
+// 3. To remove all listeners managed by the container:
+// buttonEvents.cleanup();
+```
+
+### High-Level Interactions
+
+Interactions are reusable, stateful event handlers that compose multiple low-level events into a single, semantic user behavior.
+
+-   **`press`**: Normalizes clicks, taps, and key presses into a single event.
+
+### Event Composition with `preventDefault()`
+
+When you attach multiple handlers for the same event type, they form a middleware chain. Any handler in the chain can call `event.preventDefault()` to stop subsequent handlers from executing. This is perfect for building composable components.
+
+```typescript
+function SmartLink({ href, onClick }) {
+  const linkEvents = events(linkElement);
+
+  linkEvents.on([
+    // 1. The consumer's onClick runs first.
+    dom.click(event => {
+      if (shouldCancelNavigation()) {
+        // This will stop our navigation logic below.
+        event.preventDefault();
+      }
+      onClick(event);
+    }),
+
+    // 2. Our component's default behavior runs second.
+    dom.click(event => {
+      // This code will not run if the consumer called preventDefault().
+      console.log('Navigating to', href);
+      navigateTo(href);
+    })
+  ]);
+}
+```
+
+### Creating Custom Interactions
+
+You can encapsulate any complex, stateful event logic into your own reusable interaction with `createInteraction`.
+
+Here’s a simple `longPress` interaction that fires an event after the mouse has been held down for 500ms.
+
+```typescript
+import { createInteraction, dom } from '@doeixd/events';
+
+// 1. Define the interaction
+const longPress = createInteraction<Element, { duration: number }>(
+  'longpress', // The name of the custom event it will dispatch
+  ({ target, dispatch }) => {
+    let timer;
+
+    // Use our core `dom` helpers and subscription stack for robust logic
+    const onMouseDown = dom.mousedown(target);
+    const onMouseUp = dom.mouseup(window); // Listen on window to catch mouseup anywhere
+
+    const downSub = onMouseDown(e => {
+      const startTime = Date.now();
+      timer = setTimeout(() => {
+        dispatch({ detail: { duration: Date.now() - startTime } });
+      }, 500);
+    });
+
+    const upSub = onMouseUp(() => clearTimeout(timer));
+
+    // The factory must return its cleanup functions
+    return [downSub, upSub];
+  }
+);
+
+// 2. Use the new interaction
+events(myElement, [
+  longPress(e => {
+    console.log(`Element was long-pressed for ${e.detail.duration}ms!`);
+  })
+]);
+```
+
 ### Summary of Remix Bridge Functions
 
 | Function                   | Purpose                                                                                |

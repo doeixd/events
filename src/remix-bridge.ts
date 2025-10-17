@@ -14,7 +14,7 @@ import type {
   EventHandler,
   EventWithTargets,
   InteractionDescriptor
-} from './events-remix-types.ts';
+} from './events-remix-types';
 /**
  * Remix Bridge Module
  *
@@ -152,9 +152,9 @@ export /**
  * @returns EventDescriptor that triggers the emitter
  */
 function emitterToEventDescriptor<T>(
-emitter: Emitter<T>,
-type: string,
-_signal?: AbortSignal
+  emitter: Emitter<T>,
+  type: string,
+  _signal?: AbortSignal
 ): EventDescriptor {
   return {
   type,
@@ -162,6 +162,57 @@ _signal?: AbortSignal
   // @ts-ignore
     emitter(ev.detail as T);
     }) as unknown as EventHandler
+  };
+}
+
+/**
+ * Creates an `EventDescriptor` from an `@doeixd/events` `Handler`.
+ *
+ * This is the primary bridge between the library's functional, stream-based
+ * paradigm and the declarative, Remix-style attachment model. It allows you
+ * to use the full power of `Handler` chaining and operators (`debounce`, `throttle`, etc.)
+ * within the `events()` attacher.
+ *
+ * @param handler The `@doeixd/events` `Handler` to convert.
+ * @param type The DOM event name this handler should listen to (e.g., 'click').
+ * @param callback The function to consume the event data from the handler chain.
+ * @param options Standard `addEventListener` options.
+ * @returns An `EventDescriptor` that can be passed to the `events()` function.
+ *
+ * @example
+ * import { events, fromHandler, dom, debounce } from '@doeixd/events';
+ *
+ * const inputElement = document.querySelector('input');
+ * const inputEvents = events(inputElement);
+ *
+ * // Create a debounced handler using the core library's operators
+ * const onDebouncedInput = debounce(300)(dom.input(inputElement));
+ *
+ * // Bridge it into the declarative system
+ * inputEvents.on([
+ *   fromHandler(onDebouncedInput, 'input', (event) => {
+ *     console.log('Debounced value:', (event.target as HTMLInputElement).value);
+ *   })
+ * ]);
+ */
+export function fromHandler<T>(
+  handler: Handler<T>,
+  type: string,
+  callback: (data: T) => void,
+  options?: AddEventListenerOptions
+): EventDescriptor {
+
+  // The Remix-style handler that will be attached.
+  const eventHandler: EventHandler = (_event, signal: AbortSignal) => {
+    // We use the AbortSignal from the attacher to manage the subscription's lifecycle.
+    const unsubscribe = handler(callback);
+    signal.addEventListener('abort', unsubscribe, { once: true });
+  };
+
+  return {
+    type,
+    handler: eventHandler,
+    options,
   };
 }
 
