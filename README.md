@@ -3,7 +3,7 @@
 
 # @doeixd/events
 
-A powerful, type-safe reactive event system for TypeScript/JavaScript applications. Inspired by solid-events and remix events, this library provides event primitives, framework integration, DOM utilities, and Remix Events integration for building reactive user interfaces and event-driven architectures.
+A powerful, type-safe reactive event system for TypeScript/JavaScript applications. Inspired by [solid-events](https://github.com/devagrawal09/solid-events/blob/master/README.md) and [remix events](https://www.npmjs.com/package/@remix-run/events), this library provides event primitives, framework integration, DOM utilities, and Remix Events integration for building reactive user interfaces and event-driven architectures.
 
 ## Table of Contents
 
