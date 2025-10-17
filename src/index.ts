@@ -53,7 +53,10 @@ export {
   dom,
   subjectProperty,
   subjectFromEvent,
-  on
+  on,
+  onIntersect,
+  onResize,
+  trapFocus
 } from './dom';
 
 // Remix bridge

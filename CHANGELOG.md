@@ -2,6 +2,65 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [Unreleased]
+
+### 📚 Documentation
+
+* **Comprehensive Documentation Suite**: Added five detailed architectural guides
+  * `docs/primitives.md` - When to use operators, interactions, reducers, and actors with mental models and kitchen workflow analogies
+  * `docs/async.md` - Deep dive into cancellation, control flow, disposal, batching, and the flow of asynchronous events
+  * `docs/dom.md` - Complete reference for DOM utilities including observers (`onIntersect`, `onResize`), focus management (`trapFocus`), and reactive form patterns
+  * `docs/framework-integration.md` - Integration guides for React, Vue, Svelte, and SolidJS with hooks, composables, stores, and runes
+  * `docs/positioning.md` - Architectural comparison with RxJS, SolidJS Signals, XState, and Redux to help choose the right tool
+
+* **README Enhancements**: Strategic documentation links added throughout
+  * Added link to DOM Utilities Guide in the DOM section
+  * Added link to Async Handling Guide under Remix Events and Best Practices sections
+  * Added link to Primitives Guide in the Declarative APIs section
+  * Added link to Positioning Guide in the Key Differences section
+  * Enhanced Framework Integrations section with clearer navigation
+  * Added comprehensive Documentation index section before Acknowledgments
+
+### ✨ Features
+
+* **Enhanced DOM Utilities Module** (`src/dom.ts`)
+  * Complete rewrite with comprehensive JSDoc documentation
+  * Added new mouse event shortcuts: `mouseover`, `mouseout`, `mouseenter`, `mouseleave`, `contextmenu`
+  * Added keyboard event shortcut: `keypress`
+  * Added form event shortcut: `reset`
+  * Added focus event shortcuts: `focusin`, `focusout`
+  * Added pointer event shortcuts: `pointerdown`, `pointerup`, `pointermove`, `pointerenter`, `pointerleave`
+  * Added scroll event shortcut: `scroll`
+  * Added new observer utilities:
+    - `onIntersect()` - Reactive wrapper around IntersectionObserver for viewport detection
+    - `onResize()` - Reactive wrapper around ResizeObserver for element dimension changes
+  * Added focus management utility:
+    - `trapFocus()` - Trap keyboard focus within a container for accessible modals and dialogs
+  * All shortcuts now support full `AddEventListenerOptions` (capture, passive, once, signal)
+  * Improved type safety with better TypeScript inference
+  * Enhanced comments and inline documentation for better developer experience
+
+* **Framework Integration Build System** (`package.json`)
+  * Added build scripts for Vue framework integration: `build:vue`
+  * Added build scripts for Svelte framework integration: `build:svelte`
+  * Added build scripts for SolidJS framework integration: `build:solid`
+  * Updated `build:all` to build all framework packages via new `build:packages` script
+  * Added comprehensive type-checking scripts:
+    - `type-check:all` - Type check core library and all framework packages
+    - `type-check:packages` - Type check all framework integration packages
+    - `type-check:vue`, `type-check:svelte`, `type-check:solid` - Individual package checks
+
+### 🐛 Bug Fixes
+
+* **DOM Event Typing**: Fixed event typing to work correctly with any EventTarget (not just Element)
+* **Exports**: Re-exported `createSubject` in dom.ts for internal use
+
+### 🔧 Internal
+
+* **Documentation Structure**: Created `/docs` directory with modular, focused documentation
+* **Type Safety**: Improved generic type constraints for better IDE support
+* **Code Organization**: Better separation of concerns in DOM utilities module
+
 ### [0.0.12](https://github.com/doeixd/events/compare/v0.0.11...v0.0.12) (2025-10-17)
 
 

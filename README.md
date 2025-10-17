@@ -119,7 +119,7 @@ user.subscribe((newUser) => {
 
 ## 🌐 DOM Utilities
 
-Type-safe DOM event handling with reactive bindings.
+Type-safe DOM event handling with reactive bindings. See the [DOM Utilities Guide](docs/dom.md) for comprehensive documentation on event handling, observers, and focus management.
 
 ```typescript
 import { fromDomEvent, dom, subjectProperty, on } from '@doeixd/events';
@@ -152,7 +152,7 @@ You can think of their roles as complementary:
 
 By combining them, you can build sophisticated, encapsulated, and highly readable event logic.
 
-**Additional Features**: `@doeixd/events` also provides **Handler Operators** for RxJS-style event transformations (debounce, throttle, double-click detection) and **createEvent signals** with automatic async operation abortion for safe concurrent event handling.
+**Additional Features**: `@doeixd/events` also provides **Handler Operators** for RxJS-style event transformations (debounce, throttle, double-click detection) and **createEvent signals** with automatic async operation abortion for safe concurrent event handling. See the [Async Handling Guide](docs/async.md) for deep dives on cancellation and control flow.
 
 ### Bridging the Gap: `toEventDescriptor`
 
@@ -381,6 +381,8 @@ The core architecture and API of `@doeixd/events` are heavily inspired by the ex
 
 If you are familiar with `solid-events`, you will find the API to be almost identical, enabling you to build complex, predictable logic by defining how state reacts to events.
 
+📚 **[Primitives Guide](docs/primitives.md)** - Architectural patterns and when to use each primitive (operators, interactions, reducers, actors).
+
 ### Derive State from Events (`createSubject`)
 Create a reactive subject whose value is managed exclusively by event handlers. This makes state changes traceable and predictable.
 
@@ -456,9 +458,22 @@ While the core API is parallel, `@doeixd/events` differs in a few crucial ways t
 3.  **Expanded Focus on DOM and Integrations**:
     *   `@doeixd/events` includes a rich set of **DOM Utilities** and a dedicated **Remix Integration Bridge** to provide a first-class experience in a variety of frontend environments.
 
+📚 **[Positioning Guide](docs/positioning.md)** - Compare `@doeixd/events` with RxJS, SolidJS Signals, XState, and Redux to understand trade-offs and choose the right tool.
+
 <br />
 
 ## 🎯 Framework Integrations
+
+`@doeixd/events` provides first-class integrations with popular JavaScript frameworks. Each integration package offers idiomatic APIs with automatic subscription cleanup.
+
+### Available Packages
+
+- **[@doeixd/react](packages/react)** - React Hooks with automatic lifecycle management
+- **[@doeixd/vue](packages/vue)** - Vue 3 Composables for the Composition API
+- **[@doeixd/svelte](packages/svelte)** - Svelte Stores and Runes (Svelte 4 & 5)
+- **[@doeixd/solid](packages/solid)** - SolidJS utilities with bidirectional reactivity
+
+📚 **[Framework Integration Guide](docs/framework-integration.md)** - Detailed documentation with examples for each framework.
 
 ### React Hooks (`@doeixd/react`)
 
@@ -538,6 +553,9 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 - Promises in handlers are automatically flattened
 - Use `await` in async handlers for sequential processing
 - Avoid infinite loops in reactive updates
+- **Automatic cancellation** with `AbortSignal` prevents race conditions
+
+📚 **[Async Handling Guide](docs/async.md)** - Deep dive into cancellation, control flow, disposal, and batching.
 
 ### Halting Event Chains
 - Use `halt()` to conditionally stop processing
@@ -1651,6 +1669,148 @@ Converts an Emitter to a Remix EventDescriptor.
 
 **Returns:** EventDescriptor
 
+<br>
+
+
+#### `events<Target extends EventTarget>(target: Target): EventContainer`
+
+Creates a managed container for attaching event listeners declaratively to any `EventTarget`. Supports middleware-style event handling where handlers can call `event.preventDefault()` to stop subsequent handlers.
+
+**Parameters:**
+- `target: Target` - The `EventTarget` (e.g., an element, window, or document) to attach listeners to
+
+**Returns:** EventContainer with `.on()` and `.cleanup()` methods
+
+**Example:**
+```typescript
+import { events, dom, press } from '@doeixd/events';
+
+const button = document.getElementById('my-button')!;
+
+// Create an event container
+const buttonEvents = events(button);
+
+// Attach listeners declaratively
+buttonEvents.on([
+  // Standard DOM event
+  dom.click(event => {
+    console.log('Button was clicked!');
+  }),
+
+  // Built-in interaction
+  press(event => {
+    console.log(`Button was pressed via a ${event.detail.originalEvent.type} event.`);
+  })
+]);
+
+// Clean up all listeners
+buttonEvents.cleanup();
+```
+
+<br>
+
+
+#### `createInteraction<Target extends EventTarget, Detail = any, Options = any>(eventName: string, factory: InteractionFactory<Target, Detail, Options>): (handler: EventHandler<CustomEvent<Detail>, Target>, options?: Options) => InteractionDescriptor<Target>`
+
+Creates a reusable, stateful interaction that composes multiple low-level DOM events into a single, semantic custom event.
+
+**Parameters:**
+- `eventName: string` - The name of the custom event this interaction will dispatch
+- `factory: InteractionFactory<Target, Detail, Options>` - Function that implements the interaction logic
+
+**Returns:** Function that creates InteractionDescriptors when called with a handler and options
+
+**Example:**
+```typescript
+import { createInteraction, dom } from '@doeixd/events';
+
+const longPress = createInteraction<Element, { duration: number }>(
+  'longpress',
+  ({ target, dispatch }) => {
+    let timer: number;
+
+    const onMouseDown = dom.mousedown(target);
+    const onMouseUp = dom.mouseup(window);
+
+    const downSub = onMouseDown(e => {
+      const startTime = Date.now();
+      timer = setTimeout(() => {
+        dispatch({ detail: { duration: Date.now() - startTime } });
+      }, 500);
+    });
+
+    const upSub = onMouseUp(() => clearTimeout(timer));
+
+    return [downSub, upSub];
+  }
+);
+
+// Use the interaction
+events(myElement, [
+  longPress(e => {
+    console.log(`Element was long-pressed for ${e.detail.duration}ms!`);
+  })
+]);
+```
+
+<br>
+
+
+#### `press`
+
+Built-in interaction that normalizes user input across mouse, keyboard, and touch into a single "press" event.
+
+**Type:** `InteractionDescriptor<Element>`
+
+**Dispatches:** Custom event with type `'press'` and detail `{ originalEvent: Event }`
+
+**Triggers on:**
+- Left mouse button click
+- `Enter` or `Space` key press
+- Touch tap
+
+**Example:**
+```typescript
+import { events, press } from '@doeixd/events';
+
+events(button, [
+  press(event => {
+    console.log(`Pressed with a ${event.detail.originalEvent.type} event.`);
+  })
+]);
+```
+
+<br>
+
+
+#### `fromHandler<T>(handler: Handler<T>, type: string, callback: (data: T) => void, options?: AddEventListenerOptions): EventDescriptor`
+
+Converts a `@doeixd/events` Handler into a Remix-compatible EventDescriptor for declarative event attachment.
+
+**Parameters:**
+- `handler: Handler<T>` - The handler to convert (typically from `dom.*` or other handler chains)
+- `type: string` - The DOM event name this descriptor should listen to
+- `callback: (data: T) => void` - Function called with data from the handler chain
+- `options?: AddEventListenerOptions` - Standard `addEventListener` options
+
+**Returns:** EventDescriptor ready for use with `events()`
+
+**Example:**
+```typescript
+import { events, fromHandler, dom, debounce } from '@doeixd/events';
+
+// Create a debounced input handler
+const onDebouncedInput = debounce(300)(dom.input(inputElement));
+
+// Convert to EventDescriptor
+const descriptor = fromHandler(onDebouncedInput, 'input', (event) => {
+  console.log('Debounced value:', event.target.value);
+});
+
+// Use in declarative events
+events(inputElement, [descriptor]);
+```
+
 ### SolidJS-Style Helper Functions
 
 <br>
@@ -2056,6 +2216,18 @@ The library features a robust internal subscription system for reliable resource
 ### Internal Utilities
 - **`createSubscriptionStack()`**: Factory function that returns a subscription manager, using `DisposableStack` in modern environments or an array-based fallback otherwise
 - **`createSubscriptionManager()`**: Higher-level manager implementing the Disposable protocol for automatic cleanup with the `using` keyword
+
+## 📚 Documentation
+
+Explore comprehensive guides to master `@doeixd/events`:
+
+- **[Primitives Guide](docs/primitives.md)** - When to use operators, interactions, reducers, and actors
+- **[Async Handling](docs/async.md)** - Cancellation, control flow, disposal, and batching
+- **[DOM Utilities](docs/dom.md)** - Reactive event handling, observers, and focus management
+- **[Framework Integration](docs/framework-integration.md)** - React, Vue, Svelte, and SolidJS integrations
+- **[Positioning Guide](docs/positioning.md)** - Compare with RxJS, SolidJS, XState, and Redux
+
+<br />
 
 ## 🙏 Acknowledgments
 

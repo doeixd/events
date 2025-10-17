@@ -28,7 +28,7 @@ import type {
  * const descriptor = toEventDescriptor(handler, 'custom-event');
  */
 
-import { Handler, Subject, Emitter, subjectToEventDescriptor } from './main.js';
+import { Handler, Subject, Emitter, subjectToEventDescriptor, Unsubscribe } from './main.js';
 import { dom } from './dom';
 
 /* -------------------------------------------------------------------------- */
