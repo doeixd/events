@@ -7,6 +7,7 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 
 ## Table of Contents
 
+- [📚 Documentation](#-documentation)
 - [✨ Features](#-features)
 - [📦 Installation](#-installation)
 - [🚀 Quick Start](#-quick-start)
@@ -24,6 +25,18 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 - [🔗 EventEmitter Integration](#-eventemitter-integration)
 - [🔧 Handler Operators](#-handler-operators)
 - [🎭 Actor System](#-actor-system)
+
+<br />
+
+## 📚 Documentation
+
+Explore comprehensive guides to master `@doeixd/events`:
+
+- **[Primitives Guide](docs/primitives.md)** - When to use operators, interactions, reducers, and actors
+- **[Async Handling](docs/async.md)** - Cancellation, control flow, disposal, and batching
+- **[DOM Utilities](docs/dom.md)** - Reactive event handling, observers, and focus management
+- **[Framework Integration](docs/framework-integration.md)** - React, Vue, Svelte, and SolidJS integrations
+- **[Positioning Guide](docs/positioning.md)** - Compare with RxJS, SolidJS, XState, and Redux
 
 <br />
 
@@ -2178,18 +2191,6 @@ The library features a robust internal subscription system for reliable resource
 ### Internal Utilities
 - **`createSubscriptionStack()`**: Factory function that returns a subscription manager, using `DisposableStack` in modern environments or an array-based fallback otherwise
 - **`createSubscriptionManager()`**: Higher-level manager implementing the Disposable protocol for automatic cleanup with the `using` keyword
-
-## 📚 Documentation
-
-Explore comprehensive guides to master `@doeixd/events`:
-
-- **[Primitives Guide](docs/primitives.md)** - When to use operators, interactions, reducers, and actors
-- **[Async Handling](docs/async.md)** - Cancellation, control flow, disposal, and batching
-- **[DOM Utilities](docs/dom.md)** - Reactive event handling, observers, and focus management
-- **[Framework Integration](docs/framework-integration.md)** - React, Vue, Svelte, and SolidJS integrations
-- **[Positioning Guide](docs/positioning.md)** - Compare with RxJS, SolidJS, XState, and Redux
-
-<br />
 
 ## ⚠️ Gotchas and Best Practices
 
