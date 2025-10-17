@@ -1929,6 +1929,16 @@ const loading = (store as any).dispatch.start();
 const success = (loading as any).dispatch.finish('Done');
 ```
 
+## 🛡️ Robustness & Compatibility
+
+The library employs advanced internal patterns for maximum reliability:
+
+### Subscription Management
+- **Automatic Cleanup**: All subscription combinators (`createTopic`, `combineLatest`, `select`, `on`) use a unified subscription stack for proper resource management
+- **Error Resilience**: Leverages `DisposableStack` in modern environments for superior error handling during cleanup operations
+- **Backwards Compatibility**: Provides a seamless array-based fallback for older JavaScript environments, ensuring universal compatibility
+- **Type Safety**: Full TypeScript support with runtime feature detection
+
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
