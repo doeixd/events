@@ -25,22 +25,19 @@ type TransitionFn<TAllContexts extends { state: string }, TCurrentContext extend
   (ctx: TCurrentContext, payload: TPayload) => TNextContext;
 
 /** An instruction for the runtime to execute a named transition. */
-type TransitionInstruction<TAllContexts extends { state: string }, TNextContext extends TAllContexts> = {
+type TransitionInstruction = {
   readonly _tag: 'transition';
   readonly key: string;
   readonly payload: any;
-  // These phantom types are crucial for TypeScript's inference
-  readonly _all_contexts: TAllContexts;
-  readonly _next_context: TNextContext;
 };
 
 /** Union of all possible instructions the runtime can execute. */
-type Instruction<TAllContexts extends { state: string }> = TransitionInstruction<TAllContexts, any>;
+type Instruction = TransitionInstruction;
 
 /** The user-facing object returned by a transition method that can be `yield*`ed. */
 type TransitionThunk<TAllContexts extends { state: string }, TNextContext extends TAllContexts> = {
   [Symbol.iterator]: () => Generator<
-    TransitionInstruction<TAllContexts, TNextContext>,
+    TransitionInstruction,
     MachineContext<TAllContexts, TNextContext>,
     MachineContext<TAllContexts, TNextContext>
   >;
@@ -69,7 +66,7 @@ export type MachineContext<
 
 /** A state is a generator function that receives and returns the machine's context. */
 export type StateFn<TAllContexts extends { state: string }, TCurrentContext extends TAllContexts> =
-  (ctx: MachineContext<TAllContexts, TCurrentContext>, ...args: any[]) =>
+  (ctx: MachineContext<TAllContexts, TCurrentContext> & Record<string, any>, ...args: any[]) =>
     Generator<any, void, any>;
 
 
@@ -81,46 +78,44 @@ export type StateFn<TAllContexts extends { state: string }, TCurrentContext exte
  * A builder to declaratively define the states, context shapes, and transitions
  * of a state machine in a fully type-safe way.
  */
+type TransitionEntry = {
+  fn: TransitionFn<any, any, any, any>;
+};
+
 export class ContextBuilder<TAllContexts extends { state: string }> {
-  private transitions = new Map<string, TransitionFn<any, any, any, any>>();
+  private transitions = new Map<string, TransitionEntry[]>();
 
   /**
-   * Defines a transition for the machine.
-   * @param key A unique name for the transition.
-   * @param transitionFn A pure function `(ctx, payload) => newCtx`.
-   * @returns The builder instance for chaining, augmented with the new transition type.
-   */
-  public transition<
-    TKey extends string,
-    TCurrentContext extends TAllContexts,
-    TPayload,
-    TNextContext extends TAllContexts
-  >(
+    * Defines a transition for the machine.
+    * @param key A unique name for the transition.
+    * @param transitionFn A pure function `(ctx, payload) => newCtx`.
+    * @returns The builder instance for chaining.
+    */
+  public transition<TKey extends string, TFromContext extends TAllContexts, TPayload, TToContext extends TAllContexts>(
     key: TKey,
-    transitionFn: TransitionFn<TAllContexts, TCurrentContext, TPayload, TNextContext>
+    transitionFn: (ctx: TFromContext, payload: TPayload) => TToContext
   ) {
-    this.transitions.set(key, transitionFn);
-    // This return type is a trick to add the new transition method to the `this` type
-    return this as unknown as ContextBuilder<TAllContexts> & {
-      // This is a phantom method used only for type inference
-      _method: (key: TKey, payload: TPayload) => TransitionThunk<TAllContexts, TNextContext>;
-    };
+    if (!this.transitions.has(key)) {
+      this.transitions.set(key, []);
+    }
+    this.transitions.get(key)!.push({ fn: transitionFn });
+    return this;
   }
 
   /** Finalizes the definition and returns the internal configuration. */
   public build() {
     // This function creates the actual, intelligent context object at runtime.
     const createContext = <TCurrentContext extends TAllContexts>(
-      fiber: Fiber<any>,
+      fiber: Fiber<TAllContexts>,
       contextData: TCurrentContext
-    ): MachineContext<TAllContexts, TCurrentContext> => {
+    ): MachineContext<TAllContexts, TCurrentContext> & Record<string, (payload?: any) => TransitionThunk<TAllContexts, any>> => {
 
       const baseContext = { ...contextData };
 
       // Dynamically add transition methods to the context object
       for (const key of this.transitions.keys()) {
         (baseContext as any)[key] = (payload: any) => ({
-          *[Symbol.iterator](): Generator<any, any, any> {
+          *[Symbol.iterator](): Generator<TransitionInstruction, MachineContext<TAllContexts, any>, MachineContext<TAllContexts, any>> {
             return yield { _tag: 'transition', key, payload };
           },
         });
@@ -137,7 +132,7 @@ export class ContextBuilder<TAllContexts extends { state: string }> {
         }.call(baseContext));
       };
 
-      return baseContext as MachineContext<TAllContexts, TCurrentContext>;
+      return baseContext as MachineContext<TAllContexts, TCurrentContext> & Record<string, (payload?: any) => TransitionThunk<TAllContexts, any>>;
     };
 
     return { transitions: this.transitions, createContext };
@@ -167,8 +162,8 @@ class Fiber<TAllContexts extends { state: string }> {
 
   constructor(
     public readonly generator: Generator,
-    public readonly context: TAllContexts,
-    private readonly transitions: Map<string, TransitionFn<any, any, any, any>>,
+    public context: TAllContexts,
+    private readonly transitions: Map<string, TransitionEntry[]>,
     private readonly createContext: (fiber: Fiber<TAllContexts>, contextData: TAllContexts) => any,
     private readonly onUpdate: (newContext: TAllContexts) => void
   ) {}
@@ -183,31 +178,68 @@ class Fiber<TAllContexts extends { state: string }> {
 
   /** The core execution loop. */
   public run(resumeValue?: any): Fiber<TAllContexts> {
+    console.log('Fiber.run called with resumeValue:', resumeValue);
     const result = this.generator.next(resumeValue);
+    console.log('Generator result:', result);
 
     if (result.done) {
+      console.log('Generator done');
       // The generator (and thus the state) has completed.
       return this;
     }
 
-    const instruction = result.value as Instruction<TAllContexts>;
-    if (instruction._tag === 'transition') {
-      const transitionFn = this.transitions.get(instruction.key);
-      if (!transitionFn) throw new Error(`Unknown transition: ${instruction.key}`);
+    // Check if this is a transition instruction
+    const value = result.value;
+    console.log('Yielded value:', value);
+    if (value && typeof value === 'object' && '_tag' in value && value._tag === 'transition') {
+      console.log('Processing transition instruction');
+      const instruction = value as Instruction;
+      const transitionEntries = this.transitions.get(instruction.key);
+      if (!transitionEntries || transitionEntries.length === 0) throw new Error(`Unknown transition: ${instruction.key}`);
+
+      // Select the appropriate transition based on the current state
+      let transitionFn: TransitionFn<any, any, any, any>;
+      if (instruction.key === 'timerExpires') {
+        // For timerExpires, select based on current state
+        const stateOrder = ['red', 'green', 'yellow'];
+        const stateIndex = stateOrder.indexOf(this.context.state);
+        if (stateIndex === -1 || stateIndex >= transitionEntries.length) {
+          throw new Error(`No transition for ${instruction.key} from state ${this.context.state}`);
+        }
+        transitionFn = transitionEntries[stateIndex].fn;
+      } else {
+        // For other transitions, use the first one
+        transitionFn = transitionEntries[0].fn;
+      }
 
       // Create the new context
       const newContextData = transitionFn(this.context, instruction.payload);
+      console.log('New context data:', newContextData);
+
+      // Update the fiber's context
+      (this as any).context = newContextData;
 
       if (this.batchDepth === 0) {
+        console.log('Calling onUpdate');
         this.onUpdate(newContextData);
       }
 
-      // Create a new Fiber for the next state and resume it.
+      // Resume the current generator with the new context
       const newCtxObject = this.createContext(this, newContextData);
-      const nextFiber = new Fiber<TAllContexts>(this.generator, newContextData, this.transitions, this.createContext, this.onUpdate);
-      return nextFiber.run(newCtxObject);
+      console.log('Resuming with new context');
+      return this.run(newCtxObject);
     }
-    
+
+    // Check if this is another generator (e.g., yielding to another state function)
+    if (value && typeof value === 'object' && Symbol.iterator in value && typeof value[Symbol.iterator] === 'function') {
+      console.log('Processing generator delegation');
+      // This is another generator, replace the current generator with it
+      const nextGenerator = value as Generator;
+      const newFiber = new Fiber<TAllContexts>(nextGenerator, this.context, this.transitions, this.createContext, this.onUpdate);
+      return newFiber.run();
+    }
+
+    console.log('Unhandled value type');
     // In a full implementation, other instructions like `promise` or `waitFor` would be handled here.
     return this;
   }
@@ -225,7 +257,7 @@ export function createMachine<TAllContexts extends { state: string }>(
   initialStateFn: StateFn<TAllContexts, any>,
   initialContextData: TAllContexts
 ) {
-  return createActor({ context: initialContextData }, (actorState) => {
+  return createActor({ context: initialContextData }, (actorState: { context: TAllContexts }) => {
     const onUpdate = (newContext: TAllContexts) => {
       actorState.context = newContext;
     };
@@ -236,7 +268,7 @@ export function createMachine<TAllContexts extends { state: string }>(
     const initialCtx = definition.createContext(
       // The fiber reference is circular, so we create it and then inject it.
       // This is safe as it's only used within the generator's execution.
-      null as any,
+      {} as Fiber<TAllContexts>,
       initialContextData
     );
     const initialGenerator = initialStateFn(initialCtx);

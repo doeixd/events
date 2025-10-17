@@ -16,7 +16,7 @@ To truly understand the tools in this library, let's imagine we're building a fe
 
 Each primitive in `@doeixd/events` is a different part of our kitchen's workflow, a specialized station with its own tools and responsibilities.
 
-### The Four Stations of the Kitchen
+### The Five Stations of the Kitchen
 
 | Station | Primitive | Core Job | In the Kitchen... |
 | :--- | :--- | :--- | :--- |
@@ -24,6 +24,7 @@ Each primitive in `@doeixd/events` is a different part of our kitchen's workflow
 | **Assembly Line** | `createInteraction` | **Synthesize a Behavior**| The skilled sous-chef who combines multiple prepared ingredients to create a new, complex component of the dish. |
 | **Recipe Book** | `createReducer` | **Manage Structured State**| The formal, immutable recipe that guarantees a consistent, auditable result every time. |
 | **Grill Station** | `createActor` | **Encapsulate a "Thing"**| The master chef of a specific station, managing their own tools, inventory, and complex processes. |
+| **Orchestration Station** | `createMachine` | **Coordinate Complex Flows**| The conductor who manages the symphony of state transitions and business logic sequences. |
 
 <br />
 
@@ -316,9 +317,85 @@ const socketActor = createActor(
 ```
 The actor pattern excels at encapsulating complexity, providing a clean public API while hiding the messy internal details.
 
+### The Orchestration Station: `createMachine`
+
+> **A state machine is the conductor who manages the symphony of state transitions and business logic sequences.**
+
+A state machine provides a structured, type-safe way to manage complex state transitions and business workflows. Unlike reducers which handle individual state changes, state machines excel at coordinating sequences of operations and managing stateful workflows with clear transitions between states.
+
+**When to use `createMachine`:**
+- **Complex Workflows:** When you have multi-step processes with clear state transitions (authentication flows, form wizards, game states).
+- **Business Logic Sequences:** When operations need to happen in a specific order with state-dependent behavior.
+- **Type-Safe State Management:** When you want compile-time guarantees about valid state transitions.
+- **Event-Driven Logic:** When your application logic is naturally expressed as responses to events and state changes.
+
+**Example 1: A traffic light state machine.**
+```typescript
+import { defineContext, createMachine, MachineContext } from '@doeixd/events';
+
+type LightState = { state: 'red' | 'green' | 'yellow'; timer: number };
+
+const trafficLightDef = defineContext<LightState>()
+  .transition('timer', (ctx: { state: 'red' }) => ({ state: 'green', timer: 30 }))
+  .transition('timer', (ctx: { state: 'green' }) => ({ state: 'yellow', timer: 5 }))
+  .transition('timer', (ctx: { state: 'yellow' }) => ({ state: 'red', timer: 25 }))
+  .build();
+
+function* trafficLogic(ctx: MachineContext<LightState, any>) {
+  while (true) {
+    console.log('Red light -', ctx.timer, 'seconds');
+    const greenCtx = yield* ctx.timer();
+    console.log('Green light -', greenCtx.timer, 'seconds');
+    const yellowCtx = yield* greenCtx.timer();
+    console.log('Yellow light -', yellowCtx.timer, 'seconds');
+    const redCtx = yield* yellowCtx.timer();
+  }
+}
+
+const trafficLight = createMachine(trafficLightDef, trafficLogic, { state: 'red', timer: 25 });
+```
+
+**Example 2: Form validation workflow.**
+```typescript
+type FormState =
+  | { state: 'editing'; data: any }
+  | { state: 'validating' }
+  | { state: 'submitting' }
+  | { state: 'success' }
+  | { state: 'error'; message: string };
+
+const formDef = defineContext<FormState>()
+  .transition('submit', (ctx: { state: 'editing' }) => ({ state: 'validating' }))
+  .transition('validationSuccess', (ctx: { state: 'validating' }) => ({ state: 'submitting' }))
+  .transition('submitSuccess', (ctx: { state: 'submitting' }) => ({ state: 'success' }))
+  .transition('submitError', (ctx: { state: 'validating' | 'submitting' }, error: string) => ({
+    state: 'error',
+    message: error
+  }))
+  .build();
+
+function* formLogic(ctx: MachineContext<FormState, any>) {
+  while (true) {
+    const validatingCtx = yield* ctx.submit();
+
+    try {
+      await validateForm(validatingCtx.data);
+      const submittingCtx = yield* validatingCtx.validationSuccess();
+      await submitForm(submittingCtx.data);
+      yield* submittingCtx.submitSuccess();
+      break; // Form complete
+    } catch (error) {
+      yield* validatingCtx.submitError(error.message);
+    }
+  }
+}
+```
+
+State machines bring mathematical precision to complex workflows, ensuring that invalid state transitions are impossible and providing a clear, auditable path through your application's logic.
+
 <br />
 
-## Actors vs. Interactions: Choosing the Right Tool
+## Actors vs. Interactions vs. State Machines: Choosing the Right Tool
 
 While both **Actors** and **Interactions** help you build complex, event-driven behavior, they solve different problems and work at different levels of abstraction. Understanding when to use each is crucial for clean architecture.
 
@@ -418,6 +495,161 @@ events(addButton, [
 - **Combine them** for complete event-driven features
 
 This separation creates clean, testable, and maintainable code where each primitive does exactly what it was designed for.
+
+<br />
+
+## State Machines vs. Reducers: Managing Complex State Transitions
+
+While both **State Machines** (`createMachine`) and **Reducers** (`createReducer`) manage state transitions, they serve different purposes and excel in different scenarios. Understanding their differences is crucial for choosing the right tool for complex state management.
+
+### The Core Difference
+
+| Aspect | State Machines (`createMachine`) | Reducers (`createReducer`) |
+| :--- | :--- | :--- |
+| **Purpose** | **Orchestrate complex workflows** with clear state sequences | **Manage structured state** with predictable transitions |
+| **Execution Model** | **Sequential & imperative** - generator-based flow control | **Event-driven & declarative** - action-based state updates |
+| **State Transitions** | **Type-safe sequences** - compile-time guarantees about valid transitions | **Guarded transitions** - runtime validation of state preconditions |
+| **Complexity** | **Multi-step processes** - authentication flows, wizards, game states | **Interrelated state** - form validation, data fetching, UI state |
+| **Control Flow** | **Imperative logic** - `yield*` for step-by-step execution | **Declarative actions** - dispatch actions to trigger state changes |
+| **Error Handling** | **Exception-based** - try/catch in generator functions | **State-based** - invalid transitions are impossible by design |
+
+### When to Use State Machines
+
+**State Machines** excel at **orchestrating complex, sequential workflows** where the order of operations matters and you need type-safe guarantees about state transitions:
+
+```typescript
+import { defineContext, createMachine, MachineContext } from '@doeixd/events';
+
+// Multi-step authentication flow
+type AuthStates =
+  | { state: 'unauthenticated' }
+  | { state: 'authenticating'; username: string }
+  | { state: 'verifying'; token: string }
+  | { state: 'authenticated'; user: User };
+
+const authDef = defineContext<AuthStates>()
+  .transition('login', (ctx, payload: { username: string; password: string }) => ({
+    state: 'authenticating',
+    username: payload.username
+  }))
+  .transition('challenge', (ctx, payload: { token: string }) => ({
+    state: 'verifying',
+    token: payload.token
+  }))
+  .transition('success', (ctx, payload: { user: User }) => ({
+    state: 'authenticated',
+    user: payload.user
+  }))
+  .build();
+
+function* authFlow(ctx: MachineContext<AuthStates, any>) {
+  while (true) {
+    // Step 1: Collect credentials
+    const authingCtx = yield* ctx.login({ username: 'user', password: 'pass' });
+
+    try {
+      // Step 2: Handle 2FA challenge
+      const verifyingCtx = yield* authingCtx.challenge({ token: '123456' });
+
+      // Step 3: Complete authentication
+      const user = await verifyToken(verifyingCtx.token);
+      yield* verifyingCtx.success({ user });
+      break; // Flow complete
+    } catch (error) {
+      // Reset to initial state on failure
+      yield* authingCtx.login({ username: '', password: '' });
+    }
+  }
+}
+
+const authMachine = createMachine(authDef, authFlow, { state: 'unauthenticated' });
+```
+
+**Choose State Machines when:**
+- You have **multi-step processes** with clear sequences (authentication, checkout flows, game states)
+- **Order matters** - operations must happen in a specific sequence
+- You need **type-safe workflows** - compile-time guarantees about valid state transitions
+- You're building **complex user journeys** with branching logic and error recovery
+- **Async operations** are part of the flow (API calls, timers, user input)
+
+### When to Use Reducers
+
+**Reducers** excel at **managing interrelated state** where multiple pieces of data need to stay consistent and you want declarative, predictable state updates:
+
+```typescript
+import { createGuardedReducer } from '@doeixd/events';
+
+// Form state with interdependent validation
+type FormStates =
+  | { state: 'editing'; data: any; errors: string[] }
+  | { state: 'validating'; data: any }
+  | { state: 'submitting'; data: any }
+  | { state: 'success'; result: any }
+  | { state: 'error'; errors: string[] };
+
+const formReducer = createGuardedReducer({
+  initialState: { state: 'editing', data: {}, errors: [] } as FormStates,
+  actions: {
+    update: (state: { state: 'editing' }, payload: { field: string; value: any }) => ({
+      ...state,
+      data: { ...state.data, [payload.field]: payload.value }
+    }),
+    validate: (state: { state: 'editing' }) => ({ state: 'validating', data: state.data }),
+    submit: (state: { state: 'validating' }) => ({ state: 'submitting', data: state.data }),
+    success: (state: { state: 'submitting' }, result: any) => ({ state: 'success', result }),
+    error: (state: { state: 'validating' | 'submitting' }, errors: string[]) => ({
+      state: 'error',
+      errors
+    }),
+    reset: (state) => ({ state: 'editing', data: {}, errors: [] })
+  }
+});
+
+// Usage - declarative state updates
+let form = formReducer;
+form = form.dispatch.update({ field: 'email', value: 'user@example.com' });
+form = form.dispatch.validate(); // Only valid from 'editing' state
+form = form.dispatch.submit();   // Only valid from 'validating' state
+```
+
+**Choose Reducers when:**
+- You have **interdependent state** that needs to stay consistent
+- **Multiple actions** can trigger state changes from various sources
+- You want **declarative state management** with clear action types
+- **Validation and constraints** are important (guarded reducers prevent invalid states)
+- You're building **data-heavy applications** with complex state relationships
+- **Auditability** matters - you need to track exactly how state changed
+
+### How They Work Together
+
+**State Machines** and **Reducers** are complementary and often work together:
+
+```typescript
+// State Machine orchestrates the high-level flow
+function* checkoutFlow(ctx: MachineContext<CheckoutStates, any>) {
+  const cartCtx = yield* ctx.reviewCart();
+
+  // Reducer manages the detailed cart state
+  let cart = cartReducer;
+  cart = cart.dispatch.updateQuantity({ itemId: '1', quantity: 2 });
+
+  const paymentCtx = yield* cartCtx.proceedToPayment();
+  // ... continue with payment flow
+}
+
+// Reducer handles granular state updates
+const cartReducer = createGuardedReducer({ /* cart state management */ });
+```
+
+**The Flow:** State Machine (orchestration) → Reducer (detailed state) → State Machine (continue flow)
+
+### The Decision Framework
+
+- **Use State Machines** for **complex workflows** with sequential steps and type-safe transitions
+- **Use Reducers** for **structured state** with interdependent data and declarative updates
+- **Combine them** for applications needing both orchestration and detailed state management
+
+This combination provides the best of both worlds: the clarity of state machines for complex flows with the precision of reducers for detailed state management.
 
 <br />
 
