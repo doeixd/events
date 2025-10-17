@@ -17,7 +17,6 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 - [Declarative APIs Inspired by Solid-Events](#declarative-apis-inspired-by-solid-events)
 - [🎯 Framework Integrations](#-framework-integrations)
 - [🔒 Type Safety](#-type-safety)
-- [🌐 Framework Interactions](#-framework-interactions)
 - [🌐 DOM Utilities (Expanded)](#-dom-utilities-expanded)
 - [🌐 Advanced DOM Event Handling](#-advanced-dom-event-handling)
 - [📖 Advanced Examples](#-advanced-examples)
@@ -497,43 +496,93 @@ While the core API is parallel, `@doeixd/events` differs in a few crucial ways t
 
 ## 🎯 Framework Integrations
 
-`@doeixd/events` provides first-class integrations with popular JavaScript frameworks. Each integration package offers idiomatic APIs with automatic subscription cleanup.
+`@doeixd/events` provides first-class integrations with popular JavaScript frameworks. You can either use the core library directly or leverage framework-specific integration packages for enhanced developer experience.
 
-### Available Packages
+### Integration Packages
 
-- **[@doeixd/react](packages/react)** - React Hooks with automatic lifecycle management
+For seamless integration with automatic lifecycle management and idiomatic APIs:
+
+- **[@doeixd/react](packages/react)** - React Hooks with automatic subscription cleanup
 - **[@doeixd/vue](packages/vue)** - Vue 3 Composables for the Composition API
 - **[@doeixd/svelte](packages/svelte)** - Svelte Stores and Runes (Svelte 4 & 5)
 - **[@doeixd/solid](packages/solid)** - SolidJS utilities with bidirectional reactivity
 
 📚 **[Framework Integration Guide](docs/framework-integration.md)** - Detailed documentation with examples for each framework.
 
-### React Hooks (`@doeixd/react`)
-
-For seamless React integration with automatic subscription lifecycle management:
+### React with Integration Package
 
 ```bash
 npm install @doeixd/react
 ```
 
 ```tsx
-import { useEvent, useSubject, useSubjectSelector } from '@doeixd/react';
+import { useEvent, useSubject } from '@doeixd/react';
 import { createEvent, createSubject } from '@doeixd/events';
 
 function Counter() {
   const [onIncrement, emitIncrement] = createEvent<number>();
   const count = createSubject(0);
 
-  // Meta parameter is optional for async safety
-  useEvent(onIncrement, (delta, meta) => {
-    // Use meta.signal for cancellable async operations
-    count(count() + delta);
-  });
+  useEvent(onIncrement, (delta) => count(count() + delta));
   const currentCount = useSubject(count);
 
   return <button onClick={() => emitIncrement(1)}>Count: {currentCount}</button>;
 }
 ```
+
+### Using Core Library Directly
+
+The core `@doeixd/events` library works seamlessly with any framework or vanilla JavaScript:
+
+#### React
+```typescript
+function MyComponent() {
+  const [count, setCount] = useState(0);
+  const [onIncrement, emitIncrement] = createEvent<number>();
+
+  useEffect(() => {
+    const unsub = onIncrement((delta) => setCount(c => c + delta));
+    return unsub;
+  }, []);
+
+  return <button onClick={() => emitIncrement(1)}>Count: {count}</button>;
+}
+```
+
+#### Vue
+```typescript
+<template>
+  <button @click="emitIncrement(1)">Count: {{ count }}</button>
+</template>
+
+<script setup>
+import { createEvent, createSubject } from '@doeixd/events';
+
+const [onIncrement, emitIncrement] = createEvent<number>();
+const count = createSubject(0);
+
+onIncrement((delta) => count(count() + delta));
+</script>
+```
+
+#### Svelte
+```svelte
+<script>
+  import { createEvent, createSubject } from '@doeixd/events';
+
+  const [onIncrement, emitIncrement] = createEvent<number>();
+  const count = createSubject(0);
+
+  onIncrement((delta) => count($count + delta));
+</script>
+
+<button on:click={() => emitIncrement(1)}>Count: {$count}</button>
+```
+
+**Note:** `@doeixd/events` subjects are fully compatible with Svelte's store contract, enabling the `$` auto-subscription syntax out of the box.
+
+#### Vanilla JavaScript
+Works seamlessly without any framework - full type safety with JSDoc annotations.
 
 ### Performance Optimizations
 
@@ -581,60 +630,6 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 <br />
 
 
-
-## 🌐 Framework Interactions
-
-### React
-```typescript
-function MyComponent() {
-  const [count, setCount] = useState(0);
-  const [onIncrement, emitIncrement] = createEvent<number>();
-
-  useEffect(() => {
-    const unsub = onIncrement((delta) => setCount(c => c + delta));
-    return unsub;
-  }, []);
-
-  return <button onClick={() => emitIncrement(1)}>Count: {count}</button>;
-}
-```
-
-### Vue
-```typescript
-<template>
-  <button @click="emitIncrement(1)">Count: {{ count }}</button>
-</template>
-
-<script setup>
-import { createEvent, createSubject } from '@doeixd/events';
-
-const [onIncrement, emitIncrement] = createEvent<number>();
-const count = createSubject(0);
-
-onIncrement((delta) => count(count() + delta));
-</script>
-```
-
-### Svelte
-```svelte
-<script>
-  import { createEvent, createSubject } from '@doeixd/events';
-
-  const [onIncrement, emitIncrement] = createEvent<number>();
-  const count = createSubject(0);
-
-  onIncrement((delta) => count($count + delta));
-</script>
-
-<button on:click={() => emitIncrement(1)}>Count: {$count}</button>
-```
-
-**Note:** `@doeixd/events` subjects are fully compatible with Svelte's store contract, enabling the `$` auto-subscription syntax out of the box.
-
-### Vanilla JavaScript
-Works seamlessly without any framework - full type safety with JSDoc annotations.
-
-<br />
 
 ## 🌐 DOM Utilities (Expanded)
 
