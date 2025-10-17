@@ -318,6 +318,109 @@ The actor pattern excels at encapsulating complexity, providing a clean public A
 
 <br />
 
+## Actors vs. Interactions: Choosing the Right Tool
+
+While both **Actors** and **Interactions** help you build complex, event-driven behavior, they solve different problems and work at different levels of abstraction. Understanding when to use each is crucial for clean architecture.
+
+### The Core Difference
+
+| Aspect | Interactions (`createInteraction`) | Actors (`createActor`) |
+| :--- | :--- | :--- |
+| **Purpose** | **Synthesize new events** from multiple low-level sources | **Encapsulate stateful behavior** with methods and internal logic |
+| **Scope** | **Event transformation** - takes events in, emits different events out | **State management** - maintains internal state, exposes methods |
+| **Lifecycle** | **Stateless & reusable** - same interaction can be used everywhere | **Stateful & instance-based** - each actor has its own state |
+| **API Style** | **Declarative attachment** - `events(element, [interaction])` | **Direct method calls** - `actor.method()` |
+| **Complexity** | **Multi-event coordination** - combining mouse, keyboard, touch | **Stateful side effects** - async operations, timers, complex logic |
+
+### When to Use Interactions
+
+**Interactions** are your go-to for defining **semantic user actions** that work across different input methods:
+
+```typescript
+// A "press" interaction normalizes clicks, taps, and key presses
+const press = createInteraction('press', ({ target, dispatch }) => {
+  const onMouseDown = dom.mousedown(target);
+  const onKeyDown = dom.keydown(target);
+
+  const downSub = onMouseDown(e => dispatch({ detail: { originalEvent: e } }));
+  const keySub = onKeyDown(e => {
+    if (e.key === 'Enter') dispatch({ detail: { originalEvent: e } });
+  });
+
+  return [downSub, keySub];
+});
+
+// Use it declaratively anywhere
+events(button, [press(e => console.log('Pressed!'))]);
+```
+
+**Choose Interactions when:**
+- You need to normalize different input types (mouse + keyboard + touch)
+- You're defining reusable UI behaviors (drag, swipe, longPress)
+- The behavior is primarily about event transformation, not state management
+- You want declarative, composable event handling
+
+### When to Use Actors
+
+**Actors** excel at **encapsulating complex, stateful logic** with a clean public interface:
+
+```typescript
+// A shopping cart actor manages state and provides methods
+const cartActor = createActor(
+  { items: [], total: 0 },
+  (context) => {
+    const [addItemHandler, addItem] = createEvent<Item>();
+
+    addItemHandler(item => {
+      if (typeof item === 'symbol' || item === 'dummy') return;
+      context.items.push(item);
+      context.total += item.price;
+    });
+
+    return { addItem };
+  }
+);
+
+// Direct method calls with encapsulated state
+cartActor.addItem({ id: 'prod1', price: 100 });
+console.log(cartActor()); // { items: [...], total: 100 }
+```
+
+**Choose Actors when:**
+- You need to manage complex internal state
+- The behavior involves async operations, timers, or side effects
+- You want to encapsulate business logic with a clean API
+- State changes need to be tracked and subscribed to
+- You're building services or complex components
+
+### How They Work Together
+
+**Interactions** and **Actors** are complementary and often work together:
+
+```typescript
+// An interaction captures the UI event
+events(addButton, [
+  press(() => {
+    // The actor handles the business logic
+    cartActor.addItem(currentItem);
+  })
+]);
+```
+
+**The Flow:** UI Events → **Interactions** (normalize) → **Actors** (process state) → State Updates
+
+**Interactions** handle the "what happened" (user pressed a button), while **Actors** handle the "what to do about it" (update cart, save to server, etc.).
+
+### The Decision Framework
+
+- **Use Interactions** for **UI event normalization** and **semantic behaviors**
+- **Use Actors** for **stateful business logic** and **complex operations**
+- **Combine them** for complete event-driven features
+
+This separation creates clean, testable, and maintainable code where each primitive does exactly what it was designed for.
+
+<br />
+
 ## The Full Kitchen Workflow: Architectural Patterns
 
 Mastery comes from orchestrating these primitives into a clean, unidirectional flow.
