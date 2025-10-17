@@ -2,6 +2,7 @@
   "name": "@doeixd/svelte",
   "version": "0.0.1",
   "description": "Svelte stores and Runes for @doeixd/events",
+  "readme": "README.md",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

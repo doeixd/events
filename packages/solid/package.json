@@ -2,6 +2,7 @@
   "name": "@doeixd/solid",
   "version": "0.0.1",
   "description": "SolidJS utilities for @doeixd/events - seamless, bidirectional integration",
+  "readme": "README.md",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",

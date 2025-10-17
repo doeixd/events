@@ -2,6 +2,7 @@
   "name": "@doeixd/vue",
   "version": "0.0.1",
   "description": "Vue Composables for @doeixd/events - seamless integration with Vue components",
+  "readme": "README.md",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
