@@ -1784,8 +1784,6 @@ events(inputElement, [descriptor]);
 
 ### SolidJS-Style Helper Functions
 
-<br>
-
 
 #### `createAsyncSubject<T>(asyncSource: () => Promise<T>, ...handlers: Handler<any>[]): Subject<T>`
 
@@ -1904,20 +1902,7 @@ emitB(42);
 // Logs: hello 42
 ```
 
-### Legacy APIs (Deprecated)
-
-These aliases are provided for backward compatibility but may be removed in future versions:
-
-- `createSignal` → `createSubject`
-- `createAsyncSignal` → `createAsyncSubject`
-- `createStore` → `createSubjectStore`
-- `mergeHandlers` → `createTopic`
-- `splitHandler` → `createPartition`
-
 ### Additional Exports
-
-<br>
-
 
 #### Aliases
 
