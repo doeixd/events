@@ -5,6 +5,26 @@
 
 A powerful, type-safe reactive event system for TypeScript/JavaScript applications. Inspired by solid-events and remix events, this library provides event primitives, framework integration, DOM utilities, and Remix Events integration for building reactive user interfaces and event-driven architectures.
 
+## Table of Contents
+
+- [✨ Features](#-features)
+- [📦 Installation](#-installation)
+- [🚀 Quick Start](#-quick-start)
+- [📚 Core API](#-core-api)
+- [🌐 DOM Utilities](#-dom-utilities)
+- [🔄 Remix Events Integration](#-remix-events-integration)
+- [Declarative APIs Inspired by Solid-Events](#declarative-apis-inspired-by-solid-events)
+- [🎯 Framework Integrations](#-framework-integrations)
+- [🔒 Type Safety](#-type-safety)
+- [🌐 Framework Interactions](#-framework-interactions)
+- [🌐 DOM Utilities (Expanded)](#-dom-utilities-expanded)
+- [🌐 Advanced DOM Event Handling](#-advanced-dom-event-handling)
+- [📖 Advanced Examples](#-advanced-examples)
+- [🏗️ Complete API Reference](#️-complete-api-reference)
+- [🔗 EventEmitter Integration](#-eventemitter-integration)
+- [🔧 Handler Operators](#-handler-operators)
+- [🎭 Actor System](#-actor-system)
+
 <br />
 
 ## ✨ Features
