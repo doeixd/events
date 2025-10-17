@@ -1952,6 +1952,8 @@ const reactive = adaptEmitter<{ data: string }>(emitter);
 reactive.data((payload) => console.log(payload));
 ```
 
+<br />
+
 ## 🔧 Handler Operators
 
 Building on the EventEmitter integration, `@doeixd/events` now includes pipeable handler operators for creating reusable, stateful interactions:
@@ -1967,6 +1969,8 @@ onButtonDoubleClick(() => console.log('Double click detected!'));
 ```
 
 Handler operators are functions that take a `Handler` and return a new `Handler`, enabling composable, reusable event logic similar to RxJS operators.
+
+<br />
 
 ## 🎭 Actor System
 
@@ -2111,6 +2115,8 @@ const actor = createActor(
 );
 ```
 
+<br />
+
 ## 🔄 Reducers
 
 The reducer system provides immutable, type-safe state management with fluent chaining and optional side effects.
@@ -2164,6 +2170,8 @@ const loading = (store as any).dispatch.start();
 const success = (loading as any).dispatch.finish('Done');
 ```
 
+<br />
+
 ## 🛡️ Subscription Management & Disposable Resources
 
 The library features a robust internal subscription system for reliable resource management:
@@ -2186,6 +2194,8 @@ The library features a robust internal subscription system for reliable resource
 ### Internal Utilities
 - **`createSubscriptionStack()`**: Factory function that returns a subscription manager, using `DisposableStack` in modern environments or an array-based fallback otherwise
 - **`createSubscriptionManager()`**: Higher-level manager implementing the Disposable protocol for automatic cleanup with the `using` keyword
+
+<br />
 
 ## ⚠️ Gotchas and Best Practices
 
