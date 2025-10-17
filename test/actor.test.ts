@@ -57,7 +57,7 @@ describe('createActor', () => {
       { user: { name: 'Alice', age: 25 } },
       (context) => {
         const [updateNameHandler, updateName] = createEvent();
-        updateNameHandler((newName) => { if (typeof newName === 'symbol' || newName === 'dummy') return; context.user.name = newName; });
+        updateNameHandler((newName) => { if (typeof newName === 'symbol' || newName === 'dummy') return; context.user.name = newName as string; });
         const [incrementAgeHandler, incrementAge] = createEvent();
         incrementAgeHandler((data) => { if (typeof data === 'symbol' || data === 'dummy') return; context.user.age++; });
         return { updateName, incrementAge };
@@ -80,7 +80,7 @@ describe('createActor', () => {
       { items: [1, 2, 3] },
       (context) => {
         const [addItemHandler, addItem] = createEvent();
-        addItemHandler((item) => { if (typeof item === 'symbol' || item === 'dummy') return; context.items.push(item); });
+        addItemHandler((item) => { if (typeof item === 'symbol' || item === 'dummy') return; context.items.push(item as number); });
         const [removeItemHandler, removeItem] = createEvent();
         removeItemHandler((data) => { if (typeof data === 'symbol' || data === 'dummy') return; context.items.pop(); });
         return { addItem, removeItem };
@@ -165,9 +165,9 @@ describe('createActor', () => {
       { count: 0, name: 'test' },
       (context) => {
         const [setCountHandler, setCount] = createEvent();
-        setCountHandler((value) => { if (typeof value === 'symbol' || value === 'dummy') return; context.count = value; });
+        setCountHandler((value) => { if (typeof value === 'symbol' || value === 'dummy') return; context.count = value as number; });
         const [setNameHandler, setName] = createEvent();
-        setNameHandler((value) => { if (typeof value === 'symbol' || value === 'dummy') return; context.name = value; });
+        setNameHandler((value) => { if (typeof value === 'symbol' || value === 'dummy') return; context.name = value as string; });
         return { setCount, setName };
       }
     );
@@ -182,9 +182,11 @@ describe('createActor', () => {
   it('should freeze the actor to prevent external mutation', () => {
     const actor = createActor(
       { count: 0 },
-      (context) => ({
-        increment: createEvent(() => context.count++),
-      })
+      (context) => {
+        const [handler, emit] = createEvent();
+        handler(() => context.count++);
+        return { increment: emit };
+      }
     );
 
     expect(() => {
@@ -235,7 +237,7 @@ describe('select', () => {
       { items: [] as string[] },
       (context) => {
         const [handler, emit] = createEvent();
-        handler((item) => { if (typeof item === 'symbol' || item === 'dummy') return; context.items.push(item); });
+        handler((item) => { if (typeof item === 'symbol' || item === 'dummy') return; context.items.push(item as string); });
         return { addItem: emit };
       }
     );
@@ -264,7 +266,7 @@ describe('select', () => {
       { value: 0 },
       (context) => {
         const [handler, emit] = createEvent();
-        handler((v) => { if (typeof v === 'symbol' || v === 'dummy') return; context.value = v; });
+        handler((v) => { if (typeof v === 'symbol' || v === 'dummy') return; context.value = v as number; });
         return { update: emit };
       }
     );
@@ -278,7 +280,7 @@ describe('select', () => {
     actor.update(5);
     expect(mockCallback).toHaveBeenCalledWith(10);
 
-    derived.dispose();
+    derived.dispose?.();
     actor.update(10);
     expect(mockCallback).toHaveBeenCalledTimes(1); // Should not be called again
   });

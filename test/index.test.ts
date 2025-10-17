@@ -14,7 +14,6 @@ createPartition,
 createAsyncSubject,
 createSubjectStore,
 combineLatest,
-toEventDescriptor,
 subjectToEventDescriptor,
 batch,
 DUMMY,
@@ -236,7 +235,7 @@ describe('@doeixd/events', () => {
       const [onReset, emitReset] = createEvent();
 
       const count = createSubject(0,
-        onIncrement((delta) => (current) => current + delta),
+        onIncrement((delta) => (current: any) => current + delta),
         onReset(() => 0)
       );
 
@@ -275,7 +274,7 @@ describe('@doeixd/events', () => {
 
       const subject = createAsyncSubject(
         async () => 'initial',
-        onUpdate((newValue) => (current) => newValue)
+        onUpdate((newValue) => (current: any) => newValue)
       );
 
       const mockCallback = vi.fn();
@@ -293,7 +292,7 @@ describe('@doeixd/events', () => {
     it('should create mutable store', () => {
       const [onIncrement, emitIncrement] = createEvent<number>();
       const store = createSubjectStore({ count: 0 },
-        onIncrement((delta) => (state) => {
+        onIncrement((delta) => (state: any) => {
           state.count += delta;
         })
       );
@@ -335,8 +334,8 @@ describe('@doeixd/events', () => {
       const positiveCallback = vi.fn();
       const negativeCallback = vi.fn();
 
-      onPositive((value) => { if (value === 'dummy') return; positiveCallback(value); });
-      onNegative((value) => { if (value === 'dummy') return; negativeCallback(value); });
+      onPositive((value) => { if (typeof value === 'symbol' || (value as any) === 'dummy') return; positiveCallback(value); });
+      onNegative((value) => { if (typeof value === 'symbol' || (value as any) === 'dummy') return; negativeCallback(value); });
 
       emitNumber(5);
       expect(positiveCallback).toHaveBeenCalledWith(5);
@@ -507,7 +506,7 @@ describe('@doeixd/events', () => {
       expect(received).toBe(Infinity);
 
       emit(NaN);
-      expect(isNaN(received)).toBe(true);
+      expect(isNaN(received!)).toBe(true);
     });
 
     it('should handle subjects with complex initial values', () => {
@@ -532,14 +531,14 @@ describe('@doeixd/events', () => {
       let callCount = 0;
 
       const onProcessed = onNumber((n, meta) => {
-        if (n === 'dummy') return 0;
+        if (typeof n === 'symbol' || (n as any) === 'dummy') return 0;
         callCount++;
         if (n < 0) halt();
         return n * 2;
       });
 
       const onFinal = onProcessed((n) => {
-        if (typeof n === 'symbol') return '';
+        if (typeof n === 'symbol' || n === 0) return '';
         callCount++;
         return `Result: ${n}`;
       });
@@ -607,7 +606,7 @@ describe('@doeixd/events', () => {
       subject(1);
       expect(callback).toHaveBeenCalledWith(1);
 
-      subject.dispose();
+      subject.dispose?.();
       subject(2);
       expect(callback).toHaveBeenCalledTimes(2); // No more calls after dispose
     });
@@ -619,7 +618,7 @@ describe('@doeixd/events', () => {
       const [onReset, emitReset] = createEvent();
 
       const count = createSubject(0,
-        onIncrement((delta) => (current) => current + delta),
+        onIncrement((delta) => (current: any) => current + delta),
         onReset(() => 0)
       );
 
@@ -684,7 +683,7 @@ describe('@doeixd/events', () => {
       const state = createSubject({ count: 0, messages: [] as string[] },
         onAction((action) => {
           if (typeof action === 'symbol') return;
-          return (current) => {
+          return (current: any) => {
             if (action.type === 'increment') {
               return { ...current, count: current.count + action.payload };
             }
@@ -732,7 +731,7 @@ describe('@doeixd/events', () => {
       let abortedOperations: number[] = [];
 
       handler(async (n, meta) => {
-        if (n === 'dummy') return;
+        if ((n as any) === 'dummy') return;
         try {
           // Use AbortSignal to make the promise cancellable
           await new Promise((resolve, reject) => {
@@ -743,7 +742,7 @@ describe('@doeixd/events', () => {
             });
           });
           completedOperations.push(n);
-        } catch (err) {
+        } catch (err: any) {
           if (err.message === 'Aborted') {
             abortedOperations.push(n);
           }
@@ -780,7 +779,7 @@ describe('@doeixd/events', () => {
             });
           });
           results.push(msg as string);
-        } catch (err) {
+        } catch (err: any) {
           if (err.message === 'Aborted') {
             results.push(`aborted-${msg}`);
           }
@@ -801,7 +800,7 @@ describe('@doeixd/events', () => {
       let processed: number[] = [];
 
       handler(async (n, meta) => {
-        if (n === 'dummy') return;
+        if ((n as any) === 'dummy') return;
         processed.push(n);
 
         if (n === 1) {
@@ -832,7 +831,7 @@ describe('@doeixd/events', () => {
       });
 
       const onFinal = onAsync(async (n) => {
-        if (n === 'dummy') return '';
+        if (typeof n === 'symbol') return '';
         await Promise.resolve();
         return `Async result: ${n}`;
       });
@@ -878,7 +877,7 @@ describe('@doeixd/events', () => {
       const [onNumber, emitNumber] = createEvent<number>();
 
       const [onPositive, onNegative] = createPartition(onNumber, (n) => {
-        if (n === 'dummy') return false; // Treat dummy as negative for test
+        if (typeof n === 'symbol' || (n as any) === 'dummy') return false; // Treat dummy as negative for test
         return n >= 0;
       });
 
@@ -886,12 +885,12 @@ describe('@doeixd/events', () => {
       const negativeValues: number[] = [];
 
       onPositive((value) => {
-        if (value === 'dummy') return;
+        if (typeof value === 'symbol' || (value as any) === 'dummy') return;
         positiveValues.push(value);
       });
 
       onNegative((value) => {
-        if (value === 'dummy') return;
+        if (typeof value === 'symbol' || (value as any) === 'dummy') return;
         negativeValues.push(value);
       });
 
@@ -954,10 +953,10 @@ describe('@doeixd/events', () => {
       const [onChangeTheme, emitChangeTheme] = createEvent<string>();
 
       createSubjectStore(store,
-        onAddUser((user) => (state) => {
+        onAddUser((user) => (state: any) => {
           state.users.push(user);
         }),
-        onChangeTheme((theme) => (state) => {
+        onChangeTheme((theme) => (state: any) => {
           state.settings.theme = theme;
         })
       );
@@ -976,13 +975,13 @@ describe('@doeixd/events', () => {
       const [onB, emitB] = createEvent<number>();
       const [onC, emitC] = createEvent<boolean>();
 
-      const combined = combineLatest(onA, onB, onC);
+      const combined = combineLatest<[string, number, boolean]>(onA as any, onB as any, onC as any);
 
       const received: [string, number, boolean][] = [];
 
       combined((values) => {
-        if (values.some(v => v === 'dummy')) return;
-        received.push(values as [string, number, boolean]);
+        if (values.some(v => (v as any) === 'dummy')) return;
+        received.push([values[0] as unknown as string, values[1] as unknown as number, values[2] as unknown as boolean]);
       });
 
       emitA('hello');
@@ -1004,7 +1003,7 @@ describe('@doeixd/events', () => {
       const [onUpdate, emitUpdate] = createEvent<number>();
 
       createSubject(parentSubject,
-        onUpdate((delta) => (current) => {
+        onUpdate((delta) => (current: any) => {
           current.child(current.child() + delta);
           return current;
         })
@@ -1023,7 +1022,7 @@ describe('@doeixd/events', () => {
       const [onValue, emitValue] = createEvent<number>();
 
       const onAsync = onValue(async (n) => {
-        if (n === 'dummy') return;
+        if (typeof n === 'symbol') return;
         await Promise.resolve();
         return n * 2;
       });
@@ -1031,7 +1030,7 @@ describe('@doeixd/events', () => {
       let received: number | undefined;
 
       onAsync((value) => {
-        if (value === 'dummy') return;
+        if (typeof value === 'symbol') return;
         received = value;
       });
 
@@ -1293,7 +1292,7 @@ describe('DOM Utilities', () => {
       it('should support chaining and transformation', () => {
         const emitter = createMockEmitter();
         const onData = fromEmitterEvent<{ value: string }>(emitter, 'data');
-        const onValidData = onData((data) => data === 'dummy' || data.value.length > 0 ? data : halt());
+        const onValidData = onData((data) => (typeof data === 'object' && 'value' in data && data.value.length > 0) ? data : halt());
         const mockCallback = vi.fn();
 
         onValidData(mockCallback);

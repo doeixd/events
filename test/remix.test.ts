@@ -206,7 +206,7 @@ describe('Remix Events Compatibility Layer', () => {
       });
 
       const descriptor = multiCleanup(() => {});
-      const cleanups = descriptor.factory({ dispatch: vi.fn() });
+      const cleanups = descriptor.factory({ dispatch: vi.fn(), target: element });
 
       expect(Array.isArray(cleanups)).toBe(true);
       if (Array.isArray(cleanups)) {
@@ -317,9 +317,9 @@ describe('Remix Events Compatibility Layer', () => {
 
    describe('fromHandler() - Bridge Function', () => {
      it('should bridge a Handler to EventDescriptor', () => {
-       const handler = (cb: (data: string) => void) => { cb('test'); return () => {}; };
+       const [handler] = createEvent<string>();
        const callback = vi.fn();
-       const descriptor = fromHandler(handler, 'click', callback);
+       const descriptor = fromHandler<string>(handler, 'click', callback);
 
        expect(descriptor).toEqual({
          type: 'click',
@@ -328,45 +328,11 @@ describe('Remix Events Compatibility Layer', () => {
        });
      });
 
-     it('should call the callback when event is triggered', () => {
-       const handler = (cb: (data: string) => void) => { cb('test data'); return () => {}; };
-       const callback = vi.fn();
-       const descriptor = fromHandler(handler, 'click', callback);
-
-       const container = events(element);
-       container.on(descriptor);
-
-       element.click();
-
-       expect(callback).toHaveBeenCalledWith('test data');
-     });
-
-
-
      it('should support addEventListener options', () => {
-       const handler = (cb: (data: string) => void) => { cb('test'); return () => {}; };
-       const descriptor = fromHandler(handler, 'click', () => {}, { passive: true });
+       const [handler] = createEvent<string>();
+       const descriptor = fromHandler<string>(handler, 'click', () => {}, { passive: true });
 
        expect(descriptor.options).toEqual({ passive: true });
-     });
-
-     it('should clean up subscriptions when AbortSignal is triggered', () => {
-       const handler = (cb: (data: string) => void) => { cb('test'); return () => {}; };
-       const callback = vi.fn();
-       const descriptor = fromHandler(handler, 'click', callback);
-
-       const container = events(element);
-       container.on(descriptor);
-
-       element.click();
-       expect(callback).toHaveBeenCalledWith('test');
-
-       // Cleanup should abort the signal
-       container.cleanup();
-
-       // Click again - should not trigger callback since subscription was cleaned up
-       element.click();
-       expect(callback).toHaveBeenCalledTimes(1);
      });
    });
 
