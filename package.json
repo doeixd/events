@@ -72,5 +72,8 @@
   },
   "typesVersions": {
     "*": {}
+  },
+  "vitest": {
+    "environment": "jsdom"
   }
 }

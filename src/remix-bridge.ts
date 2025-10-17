@@ -196,24 +196,32 @@ function emitterToEventDescriptor<T>(
  * ]);
  */
 export function fromHandler<T>(
-  handler: Handler<T>,
-  type: string,
-  callback: (data: T) => void,
-  options?: AddEventListenerOptions
-): EventDescriptor {
+   handler: Handler<T>,
+   type: string,
+   callback: (data: T) => void,
+   options?: AddEventListenerOptions
+ ): EventDescriptor {
 
-  // The Remix-style handler that will be attached.
-  const eventHandler: EventHandler = (_event, signal: AbortSignal) => {
-    // We use the AbortSignal from the attacher to manage the subscription's lifecycle.
-    const unsubscribe = handler(callback);
-    signal.addEventListener('abort', unsubscribe, { once: true });
-  };
+   // The Remix-style handler that will be attached.
+   let unsubscribe: Unsubscribe | null = null;
+   const eventHandler: EventHandler = (_event, signal: AbortSignal) => {
+     // Subscribe once
+     if (!unsubscribe) {
+       unsubscribe = handler(callback);
+       signal.addEventListener('abort', () => {
+         if (unsubscribe) {
+           unsubscribe();
+           unsubscribe = null;
+         }
+       }, { once: true });
+     }
+   };
 
-  return {
-    type,
-    handler: eventHandler,
-    options,
-  };
-}
+   return {
+     type,
+     handler: eventHandler,
+     options,
+   };
+ }
 
 

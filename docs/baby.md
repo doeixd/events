@@ -1,161 +1,209 @@
 # Introducing `@doeixd/events`: Where Solid's Reactivity Meets Remix's Composability
 
-In the world of modern web development, we're constantly seeking better patterns for managing the two trickiest parts of any application: state and user events. Two libraries have recently offered brilliant but distinct solutions:
+In modern web development, a great divide separates two of our most critical concerns. On one side, we have **event handling**—the chaotic, imperative world of `addEventListener`, where callbacks can quickly devolve into a tangled mess of stateful closures and manual cleanup. On the other, we have **state management**—the elegant, declarative world of libraries like Redux or SolidJS, where state is a predictable, traceable result of actions or signals.
 
-*   **`solid-events`** from the SolidJS ecosystem, which champions a declarative, reactive approach where state is a direct result of event streams.
-*   **`@remix-run/events`**, a low-level toolkit that provides a robust, composable engine for attaching event listeners and creating reusable, stateful "Interactions."
+`@doeixd/events` was born from a simple but ambitious question: What if we could bridge this divide? What if we could treat UI events with the same declarative clarity and robust structure we apply to our application state?
 
-A while ago, we imagined what would happen if you could combine the elegant, declarative logic of `solid-events` with the powerful, composable attachment engine of Remix Events. That idea became **`@doeixd/events`**—the conceptual love child of these two powerful ideas.
+The result is a mature, feature-rich toolkit that offers a unified theory for event-driven applications. It combines the reactive philosophy of SolidJS, the declarative composition of Remix Events, the transformative power of RxJS operators, and a fanatical focus on safety and resource management. This isn't just another event library; it's a new way to think about building interactive software.
 
-Today, that "baby" has grown up. With the latest version, it has not only matured but also learned some incredible new skills, incorporating the power of **RxJS-style operators** and **built-in async safety**.
+## Part 1: From Chaos to Clarity — A New Philosophy
 
-## Part 1: The SolidJS DNA - Declarative Event Logic
+At its core, `@doeixd/events` champions a single, powerful idea: **your application's state is a function of events over time.**
 
-At its core, `@doeixd/events` still carries the philosophical DNA of `solid-events`. It treats events not just as things that happen, but as streams of data that can be transformed, filtered, and composed to declaratively define your application's state.
-
-The two fundamental primitives, `createEvent` and `createSubject`, allow you to define how your state changes in response to events, right where you create it.
+Instead of scattering `setState` calls inside imperative event handlers, you define your state declaratively as a consequence of event streams. The fundamental primitives, `createEvent` and `createSubject`, make this pattern intuitive and traceable.
 
 ```typescript
 import { createEvent, createSubject } from '@doeixd/events';
 
-// 1. Define the events that can happen
+// 1. Define the "streams" of events that can occur in your system.
+// A `Handler` is a subscribable event stream; an `Emitter` pushes values into it.
 const [onIncrement, emitIncrement] = createEvent<number>();
-const [onReset, emitReset] = createEvent();
+const [onReset, emitReset] = createEvent<void>();
 
-// 2. Define state as a result of those events
+// 2. Define a piece of state (`Subject`) as a reduction of those event streams.
+// This is like saying: `const count = reduce(events, 0)`
 const count = createSubject(0,
-  // When 'onIncrement' happens, update the count
+  // When an 'onIncrement' event occurs, apply this transformation to the current state.
   onIncrement(delta => currentCount => currentCount + delta),
-  // When 'onReset' happens, set the count to 0
+
+  // When an 'onReset' event occurs, replace the state with this value.
   onReset(() => 0)
 );
 
+// 3. Subscribe to the final state.
 count.subscribe(value => console.log(`Count is now: ${value}`));
 
 emitIncrement(5); // Logs: "Count is now: 5"
 emitReset();      // Logs: "Count is now: 0"
 ```
 
-This pattern makes your state logic traceable, predictable, and co-located with the state itself.
+This pattern co-locates your state logic, making it immediately obvious how a piece of data can change and what causes those changes.
 
-## Part 2: The Remix DNA - Composable Event Attachment
+## Part 2: The Functional Core — Event Streams and Operators
 
-While the logic is inspired by Solid, the library is designed as the perfect companion to `@remix-run/events`. The relationship is simple:
+The power of `@doeixd/events` begins with its functional, stream-based primitives.
 
-*   **`@remix-run/events`** is the **engine**. It attaches listeners and builds high-level, reusable Interactions.
-*   **`@doeixd/events`** is the **logic toolkit**. It builds the reactive pipelines that process the event data.
+### The Magic of the `Handler`
 
-The `toEventDescriptor` function bridges these two worlds, allowing you to plug any powerful event chain directly into Remix's engine.
+A `Handler<T>` is more than just a callback registry; it's a chainable, transformable stream of events. When you subscribe to a `Handler`, its return type intelligently changes:
+-   If your callback returns `void`, you get back an `unsubscribe` function.
+-   If your callback returns a *value*, you get back a *new `Handler`* of that value's type.
+
+This allows for elegant, linear data-flow programming, much like `Array.map` or `Promise.then`.
 
 ```typescript
-import { events } from '@remix-run/events';
-import { dom, halt, toEventDescriptor } from '@doeixd/events';
+const [onRawInput, emitRawInput] = createEvent<string>();
 
-// Create a declarative validation pipeline
-const onValidatedSubmit = dom.submit(formElement)(event => {
-    event.preventDefault(); // Chain 1: Prevent default
-    return event;
-  })( () => {
-    if (emailInput.value.includes('@')) { // Chain 2: Validate
-      return { email: emailInput.value };
-    }
-    return halt(); // Stop the chain if invalid
-  });
+// Chain 1: Filter out empty inputs
+const onValidInput = onRawInput(value => (value.length > 0 ? value : halt()));
 
-// Bridge the pipeline to Remix and attach it
-const submitDescriptor = toEventDescriptor(onValidatedSubmit, 'submit');
-events(formElement, [submitDescriptor]);
+// Chain 2: Transform the valid string into an object
+const onUserObject = onValidInput(name => ({ id: Date.now(), name }));
+
+// Subscribe to the final, transformed stream
+onUserObject(user => {
+  // `user` is fully typed as { id: number, name: string }
+  console.log('New user:', user);
+});
+
+emitRawInput('Alice'); // Logs: New user: { id: ..., name: 'Alice' }
+emitRawInput('');      // Does nothing, halted by the first chain.
 ```
 
-## Part 3: Now with RxJS Superpowers - Introducing Handler Operators
+### Enter Operators: RxJS Superpowers
 
-This is where the library takes a massive leap forward. The latest version introduces **Handler Operators**—pipeable functions that transform event streams, just like in RxJS.
-
-Complex, stateful event logic like debouncing, throttling, or detecting double-clicks is now trivial.
-
-Let's revisit building a `doubleClick` interaction. Previously, you'd write the timing logic by hand. Now, you can just use the built-in `doubleClick` operator:
+To make these chains even more powerful, the library includes a suite of RxJS-style operators. These are pre-built, stateful transformations that solve common and complex UI problems with declarative grace.
 
 ```typescript
-import { dom } from '@doeixd/events';
-import { doubleClick } from '@doeixd/events/operators'; // Import the operator
+import { dom, debounce } from '@doeixd/events';
 
-// 1. Start with a DOM event stream
-const onButtonClick = dom.click(button);
+// Start with a raw DOM input event stream
+const onInput = dom.input(document.querySelector('input'));
 
-// 2. Pipe it through the doubleClick operator
-const onButtonDoubleClick = doubleClick(500)(onButtonClick);
+// Pipe it through the `debounce` operator
+const onDebouncedInput = debounce(300)(onInput);
 
-// 3. Subscribe to the result
-onButtonDoubleClick(() => console.log('Double click detected!'));
-```
-
-It's that simple. The operator encapsulates all the complex timer logic, leaving you with clean, declarative code. The same goes for debouncing user input:
-
-```typescript
-import { dom } from '@doeixd/events';
-import { debounce } from '@doeixd/events/operators';
-
-const onDebouncedInput = debounce(300)(dom.input(textInput));
-
-onDebouncedInput((event) => {
-  console.log('User stopped typing:', event.target.value);
+// The operator encapsulates all the complex timer logic.
+// We only subscribe to the final, clean event stream.
+onDebouncedInput(event => {
+  console.log('User stopped typing. Value:', event.target.value);
 });
 ```
+With operators like `debounce`, `throttle`, and `doubleClick`, you can stop reinventing the wheel and focus on your application's logic.
 
-These operators are not meant to replace Remix Interactions. They serve different purposes:
-*   **Handler Operators** are for transforming *single* event streams (timing, filtering, data mapping).
-*   **Remix Interactions** are for composing *multiple* event types (e.g., mouse, keyboard, touch) into a single, high-level user behavior like "press."
+## Part 3: The Declarative Layer — Interactions as Event Components
 
-They are two powerful tools that work beautifully together.
+While the functional core is perfect for data flow, the library also provides a first-class declarative system for applying logic to the UI, heavily inspired by Remix Events.
 
-## Race Conditions Begone: Automatic Async Cancellation
+### The `events()` Attacher and Middleware Composition
 
-Another sign of the library's maturity is its new focus on async safety. Handling asynchronous operations in event handlers (like fetching data) can lead to race conditions, where an old, slow response overwrites a newer one.
+The `events()` function provides a managed, declarative way to attach listeners. Crucially, it creates a **middleware chain**: handlers for the same event are executed in order, and any handler can call `event.preventDefault()` to stop the chain.
 
-`@doeixd/events` now solves this elegantly. When you create an event with `createEvent`, every handler receives an `AbortSignal`. This signal is **automatically aborted** the next time the event is emitted.
+This is a game-changer for building composable components.
+
+```typescript
+import { events, press, dom } from '@doeixd/events';
+
+const buttonEvents = events(submitButton);
+
+buttonEvents.on([
+  // 1. Validation runs first. It can act as a "gatekeeper".
+  dom.click(event => {
+    if (formIsInvalid()) {
+      // By preventing default, we stop the `press` handler below from ever running.
+      event.preventDefault(); 
+      showValidationError();
+    }
+  }),
+  
+  // 2. The `press` Interaction runs second, but only if not prevented.
+  press(event => {
+    // 'press' is a high-level interaction that normalizes mouse, touch, and keyboard events.
+    submitForm();
+  })
+]);
+```
+
+### `createInteraction`: Encapsulating Complexity
+
+This is the ultimate tool for encapsulation. `createInteraction` lets you compose multiple low-level event sources (`mousedown`, `keydown`, `touchstart`) into a single, high-level, semantic event (`press`). It lets you build your own "event components."
+
+```typescript
+import { createInteraction, dom } from '@doeixd/events';
+
+// Create a reusable 'longPress' interaction
+const longPress = createInteraction<Element, { duration: number }>(
+  'longpress',
+  ({ target, dispatch }) => {
+    let timer;
+    const onMouseDown = dom.mousedown(target);
+    const onMouseUp = dom.mouseup(window);
+
+    const downSub = onMouseDown(e => {
+      const start = Date.now();
+      timer = setTimeout(() => {
+        dispatch({ detail: { duration: Date.now() - start } });
+      }, 500);
+    });
+
+    const upSub = onMouseUp(() => clearTimeout(timer));
+    return [downSub, upSub]; // Return cleanup functions
+  }
+);
+
+// Use it declaratively!
+events(button, [ longPress(e => console.log(`Long press: ${e.detail.duration}ms`)) ]);
+```
+
+## Part 4: A Safety Net for Asynchronicity and Memory
+
+A great API isn't enough; it must also be safe. `@doeixd/events` is built with a deep focus on eliminating common bugs.
+
+### Automatic Async Cancellation
+
+Handling async operations in events is a notorious source of race conditions. `@doeixd/events` solves this automatically. Every `Handler` callback receives a `meta` object with an `AbortSignal`—a promise from the future that this operation may be cancelled. This signal is **automatically aborted** the next time the source event is emitted.
 
 ```typescript
 const [onSearch, emitSearch] = createEvent<string>();
 
 onSearch(async (query, meta) => {
   try {
-    // Pass the signal directly to fetch
     const response = await fetch(`/api/search?q=${query}`, {
-      signal: meta.signal, // This is the magic!
+      signal: meta.signal, // The magic is here!
     });
-    const data = await response.json();
-    // Update UI...
+    // ... update UI
   } catch (err) {
     if (err.name === 'AbortError') {
-      console.log('Search for previous query was cancelled.');
-      return; // Safely ignore the aborted request
+      console.log('Previous search was automatically cancelled.');
+      return; // Safely exit the stale handler.
     }
   }
 });
 
-emitSearch('react'); // Starts a fetch
-emitSearch('solid'); // Starts a new fetch and AUTOMATICALLY aborts the 'react' fetch
+emitSearch('react'); // Starts a fetch.
+emitSearch('solid'); // Starts a new fetch and AUTOMATICALLY aborts the 'react' fetch.
 ```
-This simple but powerful feature eliminates a whole class of common bugs in modern UIs.
 
-## The Framework-Agnostic Advantage
+### Robust Resource Management
 
-While its inspirations are clear, `@doeixd/events` is built to be used anywhere. It comes with:
-*   **React Hooks (`@doeixd/react`)** for automatic subscription management.
-*   **Svelte Store Compatibility** out-of-the-box.
-*   A rich set of **DOM Utilities** for vanilla JS/TS projects.
+Memory leaks from forgotten subscriptions are a thing of the past. The library embraces the modern `Disposable` standard, using `DisposableStack` under the hood. This ensures that even if one cleanup function throws an error, all other subscriptions are still properly disposed of—a guarantee that `try...finally` cannot make.
 
-The key trade-off for this flexibility remains: you are responsible for **manual memory management**. Outside of an integrated environment like `@doeixd/react`, you must call the `unsubscribe` function to prevent memory leaks.
+## Part 5: A Rich Ecosystem for Any Environment
 
-## Conclusion
+`@doeixd/events` is designed to be the engine for any application, on any framework.
+-   **React Hooks (`@doeixd/react`):** Seamless integration with React's lifecycle for automatic subscription management and re-rendering.
+-   **Advanced State Patterns:** When your state logic grows, you can graduate to `createActor` for encapsulated, stateful objects, or `createGuardedReducer` for building true, type-safe state machines that make impossible states impossible.
+-   **Framework Agnostic:** Use it in Svelte, Vue, or vanilla TypeScript projects with ease.
 
-`@doeixd/events` has evolved. It’s no longer just a clever combination of two great ideas. It's a mature, feature-rich toolkit for building robust, event-driven applications. It gives you:
+## Conclusion: The Whole is Greater than the Sum of its Parts
 
-*   The **declarative, state-from-events logic** of `solid-events`.
-*   The **composable attachment engine** of `@remix-run/events`.
-*   The **transformative power of RxJS-style operators**.
-*   The **safety of automatic async cancellation**.
+`@doeixd/events` has evolved beyond a clever combination of ideas. It is a complete and cohesive system for building modern, event-driven software. It offers:
 
-If you're looking to bring more predictability, power, and joy to your event and state management, it’s time to add this library to your toolbelt.
+-   A **philosophical foundation** that brings clarity to state management.
+-   A **powerful functional core** for transforming data streams with operators.
+-   A **declarative application layer** for composing high-level UI interactions.
+-   A **rock-solid safety net** that eliminates async race conditions and memory leaks.
+
+It's a toolkit designed to bring predictability, power, and genuine joy to the most challenging parts of web development. It's time to stop fighting with your events and start composing with them.
 
 **Check out `@doeixd/events` on [GitHub](https://github.com/doeixd/events) and [npm](https://www.npmjs.com/package/@doeixd/events).**

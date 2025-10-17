@@ -78,63 +78,75 @@ export function events<Target extends EventTarget>(target: Target): EventContain
     cleanups = [];
   };
 
-  const on = (nextDescriptors: EventDescriptor | EventDescriptor[] | undefined) => {
-    cleanupAll();
-    const descriptors = nextDescriptors ? (Array.isArray(nextDescriptors) ? nextDescriptors : [nextDescriptors]) : [];
+   const on = (nextDescriptors: EventDescriptor | EventDescriptor[] | undefined) => {
+     cleanupAll();
+     const descriptors = nextDescriptors ? (Array.isArray(nextDescriptors) ? nextDescriptors : [nextDescriptors]) : [];
 
-    if (descriptors.length === 0) return;
+     if (descriptors.length === 0) return;
 
-    const { custom, standard } = splitDescriptors(descriptors);
+     const { custom, standard } = splitDescriptors(descriptors);
 
-    // 1. Prepare and run the factories for all custom interactions.
-    // The factories attach the underlying low-level listeners.
-    const preparedInteractionTypes = new Set<string>();
-    for (const descriptor of custom) {
-      if (preparedInteractionTypes.has(descriptor.type)) continue;
+     // 1. Create dispatches for custom interactions
+     const dispatches = new Map<string, (options?: CustomEventInit) => void>();
+     for (const descriptor of custom) {
+       if (!dispatches.has(descriptor.type)) {
+         dispatches.set(descriptor.type, createDispatcher(target, descriptor.type));
+       }
+     }
 
-      const dispatch = createDispatcher(target, descriptor.type);
-      const factoryCleanups = descriptor.factory({ target, dispatch }, descriptor.factoryOptions);
+     // 2. Group all handlers by event type to implement the middleware chain.
+     const handlersByType = new Map<string, EventDescriptor<Target>[]>();
+     for (const descriptor of [...standard, ...custom]) {
+       if (!handlersByType.has(descriptor.type)) {
+         handlersByType.set(descriptor.type, []);
+       }
+       handlersByType.get(descriptor.type)!.push(descriptor);
+     }
 
-      if (factoryCleanups) {
-        cleanups.push(...(Array.isArray(factoryCleanups) ? factoryCleanups : [factoryCleanups]));
-      }
-      preparedInteractionTypes.add(descriptor.type);
-    }
+     // 3. Attach a single "master" listener per event type.
+     for (const [eventType, eventDescriptors] of handlersByType.entries()) {
+       // This controller is for reentry management on a per-handler basis.
+       const reEntryControllers = new WeakMap<EventDescriptor, AbortController>();
 
-    // 2. Group all handlers by event type to implement the middleware chain.
-    const handlersByType = new Map<string, EventDescriptor<Target>[]>();
-    for (const descriptor of [...standard, ...custom]) {
-      if (!handlersByType.has(descriptor.type)) {
-        handlersByType.set(descriptor.type, []);
-      }
-      handlersByType.get(descriptor.type)!.push(descriptor);
-    }
+       const masterHandler = (event: Event) => {
+         for (const descriptor of eventDescriptors) {
+           if (event.defaultPrevented) {
+             break; // A previous handler in the chain called preventDefault(), so we stop.
+           }
 
-    // 3. Attach a single "master" listener per event type.
-    for (const [eventType, eventDescriptors] of handlersByType.entries()) {
-      // This controller is for reentry management on a per-handler basis.
-      const reEntryControllers = new WeakMap<EventDescriptor, AbortController>();
+           // Re-entry management: abort the previous async call from this specific handler, if any.
+           reEntryControllers.get(descriptor)?.abort();
+           const controller = new AbortController();
+           reEntryControllers.set(descriptor, controller);
 
-      const masterHandler = (event: Event) => {
-        for (const descriptor of eventDescriptors) {
-          if (event.defaultPrevented) {
-            break; // A previous handler in the chain called preventDefault(), so we stop.
-          }
+           // Execute the user's handler
+           try {
+             descriptor.handler(event as any, controller.signal);
+           } catch (err) {
+             console.error('Handler error:', err);
+           }
+         }
+       };
 
-          // Re-entry management: abort the previous async call from this specific handler, if any.
-          reEntryControllers.get(descriptor)?.abort();
-          const controller = new AbortController();
-          reEntryControllers.set(descriptor, controller);
+       target.addEventListener(eventType, masterHandler);
+       cleanups.push(() => target.removeEventListener(eventType, masterHandler));
+     }
 
-          // Execute the user's handler
-          descriptor.handler(event as any, controller.signal);
-        }
-      };
+     // 4. Prepare and run the factories for all custom interactions.
+     // The factories attach the underlying low-level listeners.
+     const preparedInteractionTypes = new Set<string>();
+     for (const descriptor of custom) {
+       if (preparedInteractionTypes.has(descriptor.type)) continue;
 
-      target.addEventListener(eventType, masterHandler);
-      cleanups.push(() => target.removeEventListener(eventType, masterHandler));
-    }
-  };
+       const dispatch = dispatches.get(descriptor.type)!;
+       const factoryCleanups = descriptor.factory({ target, dispatch }, descriptor.factoryOptions);
+
+       if (factoryCleanups) {
+         cleanups.push(...(Array.isArray(factoryCleanups) ? factoryCleanups : [factoryCleanups]));
+       }
+       preparedInteractionTypes.add(descriptor.type);
+     }
+   };
 
   const cleanup = () => {
     cleanupAll();
