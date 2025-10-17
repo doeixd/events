@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.19](https://github.com/doeixd/events/compare/v0.0.18...v0.0.19) (2025-10-17)
+
+
+### Features
+
+* Complete React and SolidJS integrations with comprehensive hook suites ([0bab34c](https://github.com/doeixd/events/commit/0bab34ce8d521ee7b6def0ac221bbefe1afc8d09))
+
 ### [0.0.18](https://github.com/doeixd/events/compare/v0.0.17...v0.0.18) (2025-10-17)
 
 
