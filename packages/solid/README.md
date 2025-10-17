@@ -89,6 +89,7 @@ function UserProfile() {
   // This component will ONLY re-render when user.name changes
   return <p>User name: {user.name}</p>;
 }
+```
 
 #### useActor
 
