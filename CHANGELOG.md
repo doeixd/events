@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.12](https://github.com/doeixd/events/compare/v0.0.11...v0.0.12) (2025-10-17)
+
+
+### Features
+
+* add actor system and enhanced reducer with effects and state-guarded functionality ([7f29240](https://github.com/doeixd/events/commit/7f2924052b303fea3ba87cd5f016ed199234a6d1))
+
+
+### Bug Fixes
+
+* remove unused Unsubscribe import ([a5cdf2e](https://github.com/doeixd/events/commit/a5cdf2ef6bee1655d470033a4d1a23cebf13cc78))
+* resolve DisposableStack type error in tests ([0579957](https://github.com/doeixd/events/commit/0579957236b90a0140d0868ab083e451d6e05420))
+
 ### [0.0.11](https://github.com/doeixd/events/compare/v0.0.10...v0.0.11) (2025-10-16)
 
 
