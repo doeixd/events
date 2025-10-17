@@ -2177,6 +2177,182 @@ const success = (loading as any).dispatch.finish('Done');
 
 <br />
 
+## 🔄 State Machines
+
+The state machine system provides type-safe, generator-based state management for complex workflows and sequential logic. State machines excel at orchestrating multi-step processes with compile-time guarantees about valid state transitions.
+
+### `defineContext<TAllContexts extends { state: string }>(): ContextBuilder<TAllContexts>`
+
+Creates a context builder for defining state machine transitions in a type-safe way.
+
+**Type Parameters:**
+- `TAllContexts` - Union type of all possible state shapes (e.g., `{ state: 'idle' } | { state: 'running' }`)
+
+**Returns:** ContextBuilder instance for chaining transition definitions
+
+**Example:**
+```typescript
+import { defineContext } from '@doeixd/events';
+
+type States = { state: 'idle' } | { state: 'running'; count: number };
+
+const machineDef = defineContext<States>()
+  .transition('start', (ctx) => ({ state: 'running', count: 0 }))
+  .transition('increment', (ctx, amount: number) => ({
+    ...ctx,
+    count: ctx.count + amount
+  }))
+  .transition('stop', (ctx) => ({ state: 'idle' }))
+  .build();
+```
+
+### `ContextBuilder<TAllContexts>`
+
+Builder class for defining state machine transitions and context creation.
+
+#### `transition<TKey extends string, TFromContext extends TAllContexts, TPayload, TToContext extends TAllContexts>(key: TKey, transitionFn: (ctx: TFromContext, payload: TPayload) => TToContext): ContextBuilder<TAllContexts>`
+
+Adds a transition to the state machine.
+
+**Parameters:**
+- `key: TKey` - Unique name for the transition
+- `transitionFn: (ctx: TFromContext, payload: TPayload) => TToContext` - Pure function that transforms state
+
+**Returns:** Builder instance for chaining
+
+#### `build(): { transitions: Map<string, TransitionEntry[]>; createContext: Function }`
+
+Finalizes the machine definition and returns the internal configuration.
+
+**Returns:** Object with transitions map and context creation function
+
+### `createMachine<TAllContexts extends { state: string }>(definition: ReturnType<ContextBuilder<TAllContexts>['build']>, initialStateFn: StateFn<TAllContexts, any>, initialContextData: TAllContexts): Actor<{ context: TAllContexts }, {}>`
+
+Creates a running state machine instance.
+
+**Parameters:**
+- `definition` - Machine definition from ContextBuilder.build()
+- `initialStateFn: StateFn<TAllContexts, any>` - Generator function defining the initial state logic
+- `initialContextData: TAllContexts` - Initial state data
+
+**Returns:** Actor representing the running machine
+
+**Example:**
+```typescript
+import { createMachine, MachineContext } from '@doeixd/events';
+
+function* counterLogic(ctx: MachineContext<States, { state: 'idle' }>) {
+  while (true) {
+    const runningCtx = yield* ctx.start();
+    yield* runningCtx.increment(5);
+    yield* runningCtx.stop();
+  }
+}
+
+const counter = createMachine(machineDef, counterLogic, { state: 'idle' });
+
+// Subscribe to state changes
+counter.subscribe(state => {
+  console.log('State:', state.context.state, 'Count:', state.context.count);
+});
+```
+
+### `MachineContext<TAllContexts extends { state: string }, TCurrentContext extends TAllContexts>`
+
+The intelligent, type-safe context object passed to state generator functions. Contains the current state data and dynamically added transition methods.
+
+**Type Parameters:**
+- `TAllContexts` - Union of all possible state shapes
+- `TCurrentContext` - Current specific state shape
+
+**Properties:**
+- All properties from `TCurrentContext`
+- `batch(fn: Generator): Generator` - Groups multiple transitions into atomic updates
+- Dynamically added transition methods based on defined transitions
+
+### `StateFn<TAllContexts extends { state: string }, TCurrentContext extends TAllContexts>`
+
+Type for state generator functions that define machine behavior.
+
+**Type Parameters:**
+- `TAllContexts` - Union of all possible state shapes
+- `TCurrentContext` - Current state shape for this function
+
+**Signature:** `(ctx: MachineContext<TAllContexts, TCurrentContext>, ...args: any[]) => Generator<any, void, any>`
+
+### Advanced State Machine Example
+
+```typescript
+import { defineContext, createMachine, MachineContext } from '@doeixd/events';
+
+// Define state types
+type TrafficLightStates =
+  | { readonly state: 'red'; readonly canGo: false }
+  | { readonly state: 'green'; readonly canGo: true }
+  | { readonly state: 'yellow'; readonly canGo: false };
+
+// Define transitions
+const trafficLightDef = defineContext<TrafficLightStates>()
+  .transition('timerExpires', (ctx: { state: 'red' }) => ({ state: 'green', canGo: true }))
+  .transition('timerExpires', (ctx: { state: 'green' }) => ({ state: 'yellow', canGo: false }))
+  .transition('timerExpires', (ctx: { state: 'yellow' }) => ({ state: 'red', canGo: false }))
+  .transition('emergency', (ctx: { state: 'green' } | { state: 'yellow' }, payload: { reason: string }) => ({
+    state: 'red',
+    canGo: false
+  }))
+  .build();
+
+// Define state logic
+function* redLight(ctx: MachineContext<TrafficLightStates, { state: 'red' }>) {
+  console.log('🚦 Red light - Stop!');
+  const greenCtx = yield* ctx.timerExpires();
+  yield* greenLight(greenCtx);
+}
+
+function* greenLight(ctx: MachineContext<TrafficLightStates, { state: 'green' }>) {
+  console.log('🚦 Green light - Go!');
+  const yellowCtx = yield* ctx.timerExpires();
+  yield* yellowLight(yellowCtx);
+}
+
+function* yellowLight(ctx: MachineContext<TrafficLightStates, { state: 'yellow' }>) {
+  console.log('🚦 Yellow light - Caution!');
+  const redCtx = yield* ctx.timerExpires();
+  yield* redLight(redCtx);
+}
+
+// Create and run the machine
+const trafficLight = createMachine(
+  trafficLightDef,
+  redLight,
+  { state: 'red', canGo: false }
+);
+
+// Subscribe to state changes
+trafficLight.subscribe(state => {
+  console.log(`Light changed to: ${state.context.state}`);
+});
+
+// Trigger emergency (only available when green or yellow)
+setTimeout(() => {
+  // This would be a compile error if called from red state
+  // trafficLight.trigger('emergency', { reason: 'Ambulance approaching' });
+}, 1000);
+```
+
+### State Machine vs Reducer Comparison
+
+| Aspect | State Machines | Reducers |
+| :--- | :--- | :--- |
+| **Purpose** | Orchestrate complex workflows with sequential steps | Manage structured state with predictable transitions |
+| **Execution Model** | Generator-based imperative logic | Declarative action-based updates |
+| **State Transitions** | Type-safe sequences with compile-time guarantees | Guarded transitions with runtime validation |
+| **Best For** | Multi-step processes, authentication flows, game states | Form validation, data fetching, UI state management |
+| **Control Flow** | `yield*` for step-by-step execution | `dispatch.action()` for state updates |
+| **Complexity** | High - handles complex sequential logic | Medium - manages interrelated state |
+
+<br />
+
 ## 🛡️ Subscription Management & Disposable Resources
 
 The library features a robust internal subscription system for reliable resource management:
