@@ -12,12 +12,11 @@ A powerful, type-safe reactive event system for TypeScript/JavaScript applicatio
 - [📦 Installation](#-installation)
 - [🚀 Quick Start](#-quick-start)
 - [📚 Core API](#-core-api)
-- [🌐 DOM Utilities](#-dom-utilities)
 - [🔄 Remix Events Integration](#-remix-events-integration)
 - [Declarative APIs Inspired by Solid-Events](#declarative-apis-inspired-by-solid-events)
 - [🎯 Framework Integrations](#-framework-integrations)
 - [🔒 Type Safety](#-type-safety)
-- [🌐 DOM Utilities (Expanded)](#-dom-utilities-expanded)
+- [🌐 DOM Utilities](#-dom-utilities)
 - [🌐 Advanced DOM Event Handling](#-advanced-dom-event-handling)
 - [📖 Advanced Examples](#-advanced-examples)
 - [🏗️ Complete API Reference](#️-complete-api-reference)
@@ -149,30 +148,7 @@ user.subscribe((newUser) => {
 });
 ```
 
-## 🌐 DOM Utilities
 
-Type-safe DOM event handling with reactive bindings. See the [DOM Utilities Guide](docs/dom.md) for comprehensive documentation on event handling, observers, and focus management.
-
-```typescript
-import { fromDomEvent, dom, subjectProperty, on } from '@doeixd/events';
-
-// Direct DOM event handling
-const clickHandler = dom.click(buttonElement);
-clickHandler(() => console.log('Clicked!'));
-
-// Reactive DOM properties
-const inputValue = subjectProperty(inputElement, 'value');
-inputValue.subscribe((value) => {
-  console.log('Input changed:', value);
-});
-
-// Multi-element handling
-on([button1, button2, button3], 'click', () => {
-  console.log('Button clicked!');
-});
-```
-
-<br />
 
 ## 🔄 Remix Events Integration
 
@@ -631,7 +607,32 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 
 
 
-## 🌐 DOM Utilities (Expanded)
+## 🌐 DOM Utilities
+
+Type-safe DOM event handling with reactive bindings. See the [DOM Utilities Guide](docs/dom.md) for comprehensive documentation on event handling, observers, and focus management.
+
+### Basic DOM Event Handling
+
+```typescript
+import { fromDomEvent, dom, subjectProperty, on } from '@doeixd/events';
+
+// Direct DOM event handling
+const clickHandler = dom.click(buttonElement);
+clickHandler(() => console.log('Clicked!'));
+
+// Reactive DOM properties
+const inputValue = subjectProperty(inputElement, 'value');
+inputValue.subscribe((value) => {
+  console.log('Input changed:', value);
+});
+
+// Multi-element handling
+on([button1, button2, button3], 'click', () => {
+  console.log('Button clicked!');
+});
+```
+
+### Advanced DOM Patterns
 
 Beyond the basic examples, here are advanced DOM patterns:
 
