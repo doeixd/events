@@ -92,3 +92,7 @@ export * from './integrations/emitter';
 
 // Operators
 export * from './operators';
+
+export * from './actor';
+
+export * from './reducer';

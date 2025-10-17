@@ -1733,6 +1733,149 @@ onButtonDoubleClick(() => console.log('Double click detected!'));
 
 Handler operators are functions that take a `Handler` and return a new `Handler`, enabling composable, reusable event logic similar to RxJS operators.
 
+## 🎭 Actor System
+
+The actor system provides a higher-level abstraction for managing state and behavior in a reactive, encapsulated way. Actors combine state management with event-driven behavior, similar to the actor model in concurrent programming.
+
+### `createActor<TContext, TEmitters>(initialContext: TContext, setup: (context: TContext) => TEmitters, effects?: ActorEffect<TContext>): Actor<TContext, TEmitters>`
+
+Creates a new actor instance with reactive state and event-driven methods.
+
+**Parameters:**
+- `initialContext: TContext` - Initial state object for the actor
+- `setup: (context: TContext) => TEmitters` - Function that defines the actor's behavior and returns emitter methods
+- `effects?: ActorEffect<TContext>` - Optional side effect handler called after state changes
+
+**Returns:** Actor instance with reactive state access and emitter methods
+
+**Example:**
+```typescript
+import { createActor, createEvent } from '@doeixd/events';
+
+const counterActor = createActor(
+  { count: 0 },
+  (context) => {
+    const [, increment] = createEvent((data) => {
+      if (typeof data === 'symbol' || data === 'dummy') return;
+      context.count++;
+    });
+    const [, decrement] = createEvent((data) => {
+      if (typeof data === 'symbol' || data === 'dummy') return;
+      context.count--;
+    });
+    return { increment, decrement };
+  }
+);
+
+// Access current state
+console.log(counterActor()); // { count: 0 }
+
+// Trigger behavior
+counterActor.increment();
+console.log(counterActor()); // { count: 1 }
+
+// Subscribe to state changes
+counterActor.subscribe((state) => console.log('State changed:', state));
+```
+
+### `select<T>(sources: Subscribable<any>[], projection: () => T): Subject<T>`
+
+Creates a derived reactive value from one or more actor or subject sources.
+
+**Parameters:**
+- `sources: Subscribable<any>[]` - Array of actors or subjects to derive from
+- `projection: () => T` - Function that computes the derived value from current source states
+
+**Returns:** Read-only reactive subject representing the derived state
+
+**Example:**
+```typescript
+import { createActor, select, createEvent } from '@doeixd/events';
+
+const authActor = createActor(
+  { isLoggedIn: false },
+  (context) => {
+    const [, login] = createEvent((data) => {
+      if (typeof data === 'symbol' || data === 'dummy') return;
+      context.isLoggedIn = true;
+    });
+    return { login };
+  }
+);
+
+const cartActor = createActor(
+  { items: [] as string[] },
+  (context) => {
+    const [, addItem] = createEvent((item) => {
+      if (typeof item === 'symbol' || item === 'dummy') return;
+      context.items.push(item);
+    });
+    return { addItem };
+  }
+);
+
+// Derive computed state
+const canCheckout = select(
+  [authActor, cartActor],
+  () => authActor().isLoggedIn && cartActor().items.length > 0
+);
+
+console.log(canCheckout()); // false
+
+authActor.login();
+cartActor.addItem('item1');
+console.log(canCheckout()); // true
+
+// Subscribe to derived state changes
+canCheckout.subscribe((canCheckout) => {
+  console.log('Can checkout:', canCheckout);
+});
+
+// Cleanup when done
+canCheckout.dispose();
+```
+
+### `Actor<TContext, TEmitters>`
+
+Type representing an actor instance with reactive state and emitter methods.
+
+**Type Parameters:**
+- `TContext` - Shape of the actor's internal state object
+- `TEmitters` - Shape of the emitter methods returned by the setup function
+
+**Properties:**
+- `(): TContext` - Function to access current state snapshot
+- `subscribe: Subject<TContext>['subscribe']` - Subscribe to state changes
+- `...TEmitters` - Emitter methods defined in setup function
+
+### `ActorEffect<TContext>`
+
+Type for side effect functions that run after actor state changes.
+
+**Type Parameters:**
+- `TContext` - Shape of the actor's state object
+
+**Signature:** `(newContext: TContext, oldContext: TContext) => void`
+
+**Example:**
+```typescript
+const loggingEffect = (newContext, oldContext) => {
+  console.log('State changed:', { from: oldContext, to: newContext });
+};
+
+const actor = createActor(
+  { count: 0 },
+  (context) => {
+    const [, increment] = createEvent((data) => {
+      if (typeof data === 'symbol' || data === 'dummy') return;
+      context.count++;
+    });
+    return { increment };
+  },
+  loggingEffect
+);
+```
+
 ## 🙏 Acknowledgments
 
 Inspired by solid-events, remix events, SolidJS, RxJS, and modern reactive programming patterns. Built with TypeScript for maximum type safety and developer experience.
