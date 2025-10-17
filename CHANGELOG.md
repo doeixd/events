@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.16](https://github.com/doeixd/events/compare/v0.0.15...v0.0.16) (2025-10-17)
+
+
+### Features
+
+* Add comprehensive State Machines implementation and documentation ([b7eeb0b](https://github.com/doeixd/events/commit/b7eeb0bed9b41129c8d0db2ecc16b811f97dbaac))
+* export state-machine, stack, and remix-bridge modules ([295f9e2](https://github.com/doeixd/events/commit/295f9e26d979ddd89414ede3917b43871ad046c1))
+
+
+### Bug Fixes
+
+* resolve TypeScript errors in state-machine.ts ([190cbaa](https://github.com/doeixd/events/commit/190cbaafffd09a5d32794639c58698ccf93441cd))
+
 ### [0.0.15](https://github.com/doeixd/events/compare/v0.0.14...v0.0.15) (2025-10-17)
 
 ### [0.0.14](https://github.com/doeixd/events/compare/v0.0.13...v0.0.14) (2025-10-17)
