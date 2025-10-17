@@ -49,15 +49,7 @@ export function createSubject<T>(initial?: T | (() => T), secondArg?: { batch?: 
 }
 
 // DOM utilities
-export {
-  dom,
-  subjectProperty,
-  subjectFromEvent,
-  on,
-  onIntersect,
-  onResize,
-  trapFocus
-} from './dom';
+export * from './dom';
 
 // Remix bridge
 export {
@@ -101,6 +93,12 @@ export * from './actor';
 export * from './reducer';
 
 export * from './disposable';
+
+export * from './state-machine'
+
+export * from './stack';
+
+export * from './remix-bridge';
 
 // -- Remix Events Compatibility Layer --
 // Re-export types for convenience
