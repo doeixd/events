@@ -1,10 +1,10 @@
 # Architectural Comparison: `@doeixd/events` in the Reactive Ecosystem
 
-Choosing a state and event management library is one of the most significant architectural decisions you can make. It dictates not just how you write code, but how you *think* about the flow of data and the logic of your application. The right choice can lead to a clean, scalable, and delightful developer experience, while the wrong one can lead to complexity and frustration.
+Choosing a state and event management library is one of the most significant architectural decisions you can make. It shapes not just your code, but your entire approach to data flow and application logic.
 
-`@doeixd/events` is a "synthetic" library, intentionally borrowing and blending concepts from the best-in-class tools in the ecosystem. To truly understand its power and place, we must compare it not just on features, but on philosophy, mental models, and the specific problems it is designed to solve.
+`@doeixd/events` is a "synthetic" library that blends concepts from the best tools in the ecosystem. To understand its value, we must compare it philosophically—not just on features, but on mental models and problem-solving approaches.
 
-This guide provides a detailed architectural comparison between `@doeixd/events` and four major paradigms, helping you understand the trade-offs and choose the right tool for your specific challenge.
+This guide provides a detailed architectural comparison with four major paradigms, helping you understand the trade-offs and choose the right tool for your specific challenge.
 
 **The Contenders:**
 1.  **RxJS:** The powerhouse of Reactive Stream programming.
@@ -34,10 +34,10 @@ RxJS is the most powerful and comprehensive library for reactive programming in 
 
 | Aspect | RxJS | `@doeixd/events` |
 | :--- | :--- | :--- |
-| **Scope & API Surface** | **Vast & General-Purpose.** A massive library with hundreds of operators, Schedulers for time control, and multiple Subject types. It can do anything, which can be intimidating. | **Curated & UI-Focused.** A smaller, opinionated set of tools specifically tailored for UI development and application state. Less power, but a much gentler learning curve. |
-| **Ergonomics for UI** | **Verbose.** The common UI task of creating a listenable/emittable event pair requires manually creating and exposing a `Subject`. | **Concise & Intuitive.** The `[Handler, Emitter]` tuple from `createEvent` is a highly ergonomic pattern that directly models the common need for an event source and sink. |
-| **Cancellation Model** | **Internal & Subscription-based.** Uses its own `Subscription` and `teardown` logic. Powerful but requires learning the RxJS-specific patterns. | **Platform-Native & Automatic.** Uses the modern `AbortSignal` for cancellation, which integrates seamlessly with `fetch` and is managed automatically on new emissions. |
-| **Primary Focus**| **Data Flow Orchestration.** RxJS excels at complex data pipelines. It's a tool for transforming and composing streams of *any* data. | **Event & State Unification.** `@doeixd/events` is a complete application toolkit that includes high-level state patterns (`Actor`, `Reducer`) and UI interactions alongside its stream capabilities. |
+| **Scope & API Surface** | **Vast & General-Purpose.** Hundreds of operators, Schedulers, and Subject types. Can do anything, but intimidating. | **Curated & UI-Focused.** Smaller, opinionated toolkit tailored for UI development. Less power, gentler learning curve. |
+| **Ergonomics for UI** | **Verbose.** Creating event pairs requires manual Subject setup. | **Concise & Intuitive.** `[Handler, Emitter]` tuple directly models event source/sink needs. |
+| **Cancellation Model** | **Internal & Subscription-based.** Custom Subscription/teardown logic. Powerful but RxJS-specific. | **Platform-Native & Automatic.** Uses `AbortSignal` for seamless `fetch` integration and automatic management. |
+| **Primary Focus**| **Data Flow Orchestration.** Excels at complex data pipelines of any type. | **Event & State Unification.** Complete toolkit with state patterns (`Actor`, `Reducer`) and UI interactions. |
 
 **Comparative Code Example: A Search Input**
 
@@ -58,10 +58,23 @@ search$.subscribe(results => updateUI(results));
 
 ```typescript
 // @doeixd/events Approach
-import { dom, debounce, map, filter } from '@doeixd/events/operators';
+import { dom, debounce, createOperator } from '@doeixd/events/operators';
 
-const onSearchQuery = map(e => e.target.value)(
-                      debounce(300)(dom.input(input)));
+// Define custom operators
+const filter = <T>(predicate: (data: T) => boolean) =>
+  createOperator<T>((data, emit, halt) => {
+    if (predicate(data)) emit(data);
+    else halt();
+  });
+
+const map = <T, R>(transformFn: (data: T) => R) =>
+  createOperator<T>((data, emit) => {
+    emit(transformFn(data));
+  });
+
+const onSearchQuery = filter((query: string) => query.length > 2)(
+                      map((e: Event) => (e.target as HTMLInputElement).value)(
+                      debounce(300)(dom.input(input))));
 
 // The async handler benefits from automatic cancellation via the `meta.signal`
 onSearchQuery(async (query, meta) => {
@@ -74,9 +87,9 @@ onSearchQuery(async (query, meta) => {
 });
 ```
 
-**The Litmus Test:**
--   **Choose RxJS** if your application's core logic can be described as "data pipelines." If you find yourself needing to frequently combine, merge, fork, and manage streams of data with complex timing (e.g., real-time analytics, complex data synchronization), RxJS is the unparalleled choice.
--   **Choose `@doeixd/events`** if your application's core logic is about **responding to user and system events to manage state**. It gives you the essential stream-shaping tools you need for UI without the full conceptual overhead of RxJS.
+**When to Choose:**
+-   **RxJS** for applications where core logic is "data pipelines" with complex stream manipulation, merging, and timing (e.g., real-time analytics, data synchronization).
+-   **`@doeixd/events`** for applications focused on responding to user/system events to manage state, with essential UI stream tools minus RxJS's conceptual overhead.
 
 <br />
 
@@ -88,9 +101,9 @@ SolidJS's reactivity system is a masterpiece of performance and simplicity, achi
 
 | Aspect | SolidJS Signals | `@doeixd/events` |
 | :--- | :--- | :--- |
-| **Subscription Model** | **Automatic & Implicit ("Auto-tracking").** A subscription is created *magically* whenever a signal is read inside a reactive scope (`createEffect`, JSX). No manual cleanup is needed. | **Manual & Explicit.** You must explicitly call `.subscribe()` or pass a callback to a `Handler` to create a subscription. Cleanup is your responsibility (or handled by integrations like React hooks). |
-| **Dependency Tracking** | **Runtime Graph.** Solid builds a precise dependency graph at runtime. When a signal changes, only the *exact* code that depends on it re-runs. | **Push-based.** When an event is emitted or a subject is updated, it pushes that value out to all of its explicit subscribers, regardless of whether they "need" it. |
-| **Scope** | **Framework-Integrated.** Deeply tied to the Solid compiler. Its power comes from this integration; it is not designed to be portable. | **Framework-Agnostic.** Designed from the ground up to be a standalone library that can be used in React, Vue, Svelte, or vanilla TS. |
+| **Subscription Model** | **Automatic & Implicit.** Subscriptions created magically when signals are read in reactive scopes. No manual cleanup needed. | **Manual & Explicit.** Must call `.subscribe()` or pass callback to `Handler`. Cleanup is your responsibility (or handled by framework integrations). |
+| **Dependency Tracking** | **Runtime Graph.** Precise dependency graph built at runtime. Only dependent code re-runs when signals change. | **Push-based.** Pushes values to all explicit subscribers when events emit or subjects update. |
+| **Scope** | **Framework-Integrated.** Deeply tied to Solid compiler. Power comes from this integration; not portable. | **Framework-Agnostic.** Standalone library usable in React, Vue, Svelte, or vanilla TypeScript. |
 
 **Comparative Code Example: A Derived Full Name**
 
@@ -130,9 +143,9 @@ const unsubscribe = fullName.subscribe(name => {
 firstName('Jane'); // The subscription fires.
 ```
 
-**The Litmus Test:**
--   **Choose SolidJS Signals** if you are **building an application with SolidJS**. Period. You get the full, unadulterated power of its compiler-optimized, fine-grained reactivity.
--   **Choose `@doeixd/events`** when you admire the **declarative patterns of SolidJS but are working in another framework** (like React). It allows you to write Solid-style, event-driven state logic anywhere, with the trade-off of managing subscriptions yourself.
+**When to Choose:**
+-   **SolidJS Signals** when building applications with SolidJS. Get full compiler-optimized, fine-grained reactivity.
+-   **`@doeixd/events`** when you want SolidJS-style declarative patterns in other frameworks (React, Vue, etc.), accepting manual subscription management.
 
 <br />
 
@@ -144,10 +157,10 @@ XState is the definitive implementation of Statecharts for JavaScript, providing
 
 | Aspect | XState | `@doeixd/events` (`createGuardedReducer`) |
 | :--- | :--- | :--- |
-| **Formalism & Power** | **High.** A complete and rigorous implementation of the academic Statechart model. Supports hierarchical states, parallel states, history, guards, actors, and more. | **Low ("State Machine Lite").** Provides the core benefit—compile-time transition safety via discriminated unions—without the full formal structure. It's a state machine, not a statechart. |
-| **Configuration**| **Declarative Object.** State machines are defined as large configuration objects, which can be visualized and analyzed by external tools. | **Functional.** Transitions are defined as simple, co-located functions in the `actions` object. Less formal but can feel more lightweight and closer to the code. |
-| **Ecosystem** | **Rich.** Has an extensive ecosystem including a visualizer (Stately Studio), testing tools, and model-based testing capabilities. | **Integrated.** It's just one tool within the broader `@doeixd/events` toolkit, designed to work seamlessly with `Handlers`, `Actors`, etc. |
-| **Side Effects** | **Managed & Declarative.** Side effects (`actions`, `services`) are explicitly declared in the machine definition and executed by an "interpreter". This separates logic from effects. | **Imperative (or via `Actor`).** Side effects are typically handled outside the reducer, either via the `effects` callback or by having an `Actor` manage the reducer. |
+| **Formalism & Power** | **High.** Complete Statechart implementation with hierarchical states, parallel states, history, guards, and actors. | **Low ("State Machine Lite").** Core compile-time safety via discriminated unions, without full formal structure. State machine, not statechart. |
+| **Configuration**| **Declarative Object.** Large configuration objects that can be visualized and analyzed by external tools. | **Functional.** Simple, co-located functions in `actions` object. Less formal but lightweight and code-close. |
+| **Ecosystem** | **Rich.** Visualizer (Stately Studio), testing tools, and model-based testing capabilities. | **Integrated.** One tool within broader `@doeixd/events` toolkit, works seamlessly with `Handlers`, `Actors`, etc. |
+| **Side Effects** | **Managed & Declarative.** Side effects declared in machine definition, executed by interpreter. Separates logic from effects. | **Imperative (or via `Actor`).** Side effects handled outside reducer via `effects` callback or `Actor` management. |
 
 **Comparative Code Example: A Promise Machine**
 
@@ -197,9 +210,9 @@ if (machine.status === 'pending') {
 }
 ```
 
-**The Litmus Test:**
--   **Choose XState** when your logic is **complex enough that you would draw a diagram of it on a whiteboard**. If it involves nested states (e.g., a "playing" state with child states for "buffering" and "seeking"), parallel states (e.g., managing font style and font weight independently), or requires formal verification, XState is the correct and safer choice.
--   **Choose `createGuardedReducer`** for **component-level state that has a simple, flat lifecycle**. If you just want to ensure you can't `fetch` from a `loading` state, the guarded reducer provides immense safety with minimal boilerplate.
+**When to Choose:**
+-   **XState** for complex logic requiring diagrams with nested states, parallel states, or formal verification.
+-   **`createGuardedReducer`** for component-level state with simple, flat lifecycles needing transition safety (e.g., preventing `fetch` from `loading` state).
 
 <br />
 
@@ -211,10 +224,10 @@ Redux, inspired by The Elm Architecture, popularised the pattern of a single, ce
 
 | Aspect | Redux / TEA | `@doeixd/events` (`createReducer` / `Actor`) |
 | :--- | :--- | :--- |
-| **Store Model** | **Global Singleton.** By convention, a Redux application has a single, global store that represents the entire application state. | **Local & Instantiable.** Reducers and Actors are standalone instances. You can create many of them for component state, feature state, or global state. It's more flexible and less coupled. |
-| **API** | **Message Passing.** You `dispatch` an action object (e.g., `{ type: 'INCREMENT', payload: 5 }`). This requires action creators and string constants. | **Direct & Fluent.** You call a method directly: `store.dispatch.increment(5)` or `cartActor.addItem(...)`. This is fully type-safe and avoids boilerplate. |
-| **Side Effects** | **Middleware.** Asynchronous logic and side effects are handled by a separate layer of middleware, like Redux Thunk or Redux Saga. The reducer itself must remain pure. | **Integrated (`Actor`).** The `createActor` primitive is explicitly designed to be the home for stateful side effects, co-locating the state with the async logic that affects it. |
-| **Mutability** | **Strictly Immutable.** All state updates must be immutable. | **Flexible.** `createReducer` enforces immutability. `createActor` allows for an internal, mutable style of updates, which can be more ergonomic for complex, multi-step logic. |
+| **Store Model** | **Global Singleton.** Single global store representing entire application state. | **Local & Instantiable.** Standalone instances for component, feature, or global state. More flexible, less coupled. |
+| **API** | **Message Passing.** Dispatch action objects with types and payloads. Requires action creators and constants. | **Direct & Fluent.** Call methods directly: `store.dispatch.increment(5)` or `cartActor.addItem(...)`. Fully type-safe, no boilerplate. |
+| **Side Effects** | **Middleware.** Async logic handled by separate middleware layer (Thunk, Saga). Reducer must remain pure. | **Integrated (`Actor`).** `createActor` designed as home for stateful side effects, co-locating state with async logic. |
+| **Mutability** | **Strictly Immutable.** All state updates must be immutable. | **Flexible.** `createReducer` enforces immutability. `createActor` allows mutable internal updates for complex logic. |
 
 **Comparative Code Example: Incrementing a Counter**
 
@@ -248,6 +261,6 @@ const counterReducer = createReducer({
 let counter = counterReducer.dispatch.increment(5);
 ```
 
-**The Litmus Test:**
--   **Choose Redux** when you are building a **large, multi-developer application that benefits from a single, auditable source of truth**. Its powerful DevTools, which allow for time-travel debugging, are a massive asset for traceability. The strict separation of concerns (state, actions, side effects) can enforce discipline on a large team.
--   **Choose `@doeixd/events`'s state primitives (`Reducer` or `Actor`)** for **more flexible, de-centralized state management**. It's perfect for when you want the structure of a reducer or the encapsulation of an actor for a specific feature or complex component, without committing your entire application to a global singleton. It offers a more modern, type-safe API for both dispatch and side effects.
+**When to Choose:**
+-   **Redux** for large, multi-developer applications needing single auditable source of truth, time-travel debugging, and strict separation of concerns.
+-   **`@doeixd/events` state primitives** for flexible, decentralized state management with modern type-safe APIs for specific features or components.
