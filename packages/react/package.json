@@ -1,6 +1,6 @@
 {
    "name": "@doeixd/react",
-   "version": "0.0.1",
+   "version": "0.0.19",
    "description": "React hooks for @doeixd/events - seamless integration with React components",
    "readme": "README.md",
   "main": "dist/index.js",
