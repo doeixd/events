@@ -547,65 +547,7 @@ user.subscribe((u) => console.log(u.name)); // u is fully typed
 
 <br />
 
-## ⚠️ Gotchas and Best Practices
 
-### Async Event Handling
-- Promises in handlers are automatically flattened
-- Use `await` in async handlers for sequential processing
-- Avoid infinite loops in reactive updates
-- **Automatic cancellation** with `AbortSignal` prevents race conditions
-
-📚 **[Async Handling Guide](docs/async.md)** - Deep dive into cancellation, control flow, disposal, and batching.
-
-### Halting Event Chains
-- Use `halt()` to conditionally stop processing
-- Halting throws an internal symbol, not an error
-- Useful for validation and conditional logic
-
-### Subject Updates
-- Call `subject(newValue)` to update and notify subscribers
-- Subscribers receive the current value immediately on subscription
-- Dispose subjects to clean up resources
-
-### DOM Interactions
-- Use `subjectProperty` for reactive DOM bindings
-- Clean up event listeners with AbortSignal
-- DOM utilities work in any environment with DOM API
-
-### Memory Management
-- Unsubscribe from handlers when no longer needed
-- Use `dispose()` on subjects to clear subscribers
-- Pass AbortSignal to DOM handlers for automatic cleanup
-
-<br />
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-**Q: My async handler isn't working as expected**  
-A: Ensure you're awaiting promises properly. Async handlers flatten automatically, but timing matters in tests.
-
-**Q: TypeScript complains about my handler types**  
-A: Check that your event payloads match the expected types. Use `DUMMY` for type testing if needed.
-
-**Q: DOM events aren't firing**  
-A: Make sure elements are attached to the DOM before setting up handlers. Use AbortSignal for cleanup.
-
-**Q: Memory leaks in long-running apps**  
-A: Always unsubscribe from handlers and dispose subjects when components unmount.
-
-### DUMMY Value
-The `DUMMY` export is a special value used internally for type checking handlers:
-
-```typescript
-import { DUMMY } from '@doeixd/events';
-
-// DUMMY helps determine if a handler returns a value
-// Used automatically - you typically don't need to use it directly
-```
-
-<br />
 
 ## 🌐 Framework Interactions
 
@@ -2226,6 +2168,66 @@ Explore comprehensive guides to master `@doeixd/events`:
 - **[DOM Utilities](docs/dom.md)** - Reactive event handling, observers, and focus management
 - **[Framework Integration](docs/framework-integration.md)** - React, Vue, Svelte, and SolidJS integrations
 - **[Positioning Guide](docs/positioning.md)** - Compare with RxJS, SolidJS, XState, and Redux
+
+<br />
+
+## ⚠️ Gotchas and Best Practices
+
+### Async Event Handling
+- Promises in handlers are automatically flattened
+- Use `await` in async handlers for sequential processing
+- Avoid infinite loops in reactive updates
+- **Automatic cancellation** with `AbortSignal` prevents race conditions
+
+📚 **[Async Handling Guide](docs/async.md)** - Deep dive into cancellation, control flow, disposal, and batching.
+
+### Halting Event Chains
+- Use `halt()` to conditionally stop processing
+- Halting throws an internal symbol, not an error
+- Useful for validation and conditional logic
+
+### Subject Updates
+- Call `subject(newValue)` to update and notify subscribers
+- Subscribers receive the current value immediately on subscription
+- Dispose subjects to clean up resources
+
+### DOM Interactions
+- Use `subjectProperty` for reactive DOM bindings
+- Clean up event listeners with AbortSignal
+- DOM utilities work in any environment with DOM API
+
+### Memory Management
+- Unsubscribe from handlers when no longer needed
+- Use `dispose()` on subjects to clear subscribers
+- Pass AbortSignal to DOM handlers for automatic cleanup
+
+<br />
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**Q: My async handler isn't working as expected**
+A: Ensure you're awaiting promises properly. Async handlers flatten automatically, but timing matters in tests.
+
+**Q: TypeScript complains about my handler types**
+A: Check that your event payloads match the expected types. Use `DUMMY` for type testing if needed.
+
+**Q: DOM events aren't firing**
+A: Make sure elements are attached to the DOM before setting up handlers. Use AbortSignal for cleanup.
+
+**Q: Memory leaks in long-running apps**
+A: Always unsubscribe from handlers and dispose subjects when components unmount.
+
+### DUMMY Value
+The `DUMMY` export is a special value used internally for type checking handlers:
+
+```typescript
+import { DUMMY } from '@doeixd/events';
+
+// DUMMY helps determine if a handler returns a value
+// Used automatically - you typically don't need to use it directly
+```
 
 <br />
 
