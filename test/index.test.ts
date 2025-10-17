@@ -21,6 +21,7 @@ DUMMY,
 fromEmitterEvent,
 toEmitterEvent,
 adaptEmitter,
+createOperator,
 doubleClick,
 debounce,
 throttle
@@ -1424,6 +1425,129 @@ describe('DOM Utilities', () => {
   });
 
   describe('Handler Operators', () => {
+    describe('createOperator', () => {
+      it('should create a basic filter operator', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const filterEven = createOperator<number>((data, emit, halt) => {
+          if (data % 2 === 0) {
+            emit(data);
+          } else {
+            halt();
+          }
+        });
+        const filteredHandler = filterEven(onEvent);
+        const mockCallback = vi.fn();
+
+        filteredHandler(mockCallback);
+
+        emitEvent(1); // Odd - should be filtered out
+        emitEvent(2); // Even - should pass through
+        emitEvent(3); // Odd - should be filtered out
+        emitEvent(4); // Even - should pass through
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe(2);
+        expect(actualCalls[1][0]).toBe(4);
+      });
+
+      it('should handle data transformation', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        const doubleValues = createOperator<number>((data, emit) => {
+          emit(data * 2);
+        });
+        const transformedHandler = doubleValues(onEvent);
+        const mockCallback = vi.fn();
+
+        transformedHandler(mockCallback);
+
+        emitEvent(5);
+        emitEvent(10);
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe(10);
+        expect(actualCalls[1][0]).toBe(20);
+      });
+
+      it('should handle async operations with delayed emit', async () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        const delayOperator = createOperator<string>((data, emit, halt) => {
+          setTimeout(() => emit(data.toUpperCase()), 10);
+          halt(); // Don't emit immediately
+        });
+        const delayedHandler = delayOperator(onEvent);
+        const mockCallback = vi.fn();
+
+        delayedHandler(mockCallback);
+
+        emitEvent('hello');
+        emitEvent('world');
+
+        // Should not have emitted yet
+        let actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(0);
+
+        // Wait for async operations
+        await new Promise(resolve => setTimeout(resolve, 20));
+
+        actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe('HELLO');
+        expect(actualCalls[1][0]).toBe('WORLD');
+      });
+
+      it('should properly handle DUMMY values for type checking', () => {
+        const [onEvent, emitEvent] = createEvent<string>();
+        let receivedNonDummy = false;
+
+        const testOperator = createOperator<string>((data, emit) => {
+          if (data !== 'dummy') {
+            receivedNonDummy = true;
+          }
+          emit(data);
+        });
+
+        const testHandler = testOperator(onEvent);
+        const mockCallback = vi.fn();
+
+        testHandler(mockCallback);
+
+        // DUMMY should be passed through automatically without calling process
+        expect(receivedNonDummy).toBe(false);
+        expect(mockCallback).toHaveBeenCalledWith('dummy');
+      });
+
+      it('should work with complex stateful logic', () => {
+        const [onEvent, emitEvent] = createEvent<number>();
+        let count = 0;
+
+        const takeFirstTwo = createOperator<number>((data, emit, halt) => {
+          count++;
+          if (count <= 2) {
+            emit(data);
+          } else {
+            halt();
+          }
+        });
+
+        const limitedHandler = takeFirstTwo(onEvent);
+        const mockCallback = vi.fn();
+
+        limitedHandler(mockCallback);
+
+        emitEvent(1); // Should pass
+        emitEvent(2); // Should pass
+        emitEvent(3); // Should be halted
+        emitEvent(4); // Should be halted
+
+        const actualCalls = mockCallback.mock.calls.filter(call => call[0] !== 'dummy');
+        expect(actualCalls).toHaveLength(2);
+        expect(actualCalls[0][0]).toBe(1);
+        expect(actualCalls[1][0]).toBe(2);
+      });
+    });
+
     describe('doubleClick', () => {
       it('should trigger on double click within timeout', () => {
         const [onEvent, emitEvent] = createEvent<MouseEvent>();
