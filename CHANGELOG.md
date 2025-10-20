@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.0.22](https://github.com/doeixd/events/compare/v0.0.21...v0.0.22) (2025-10-20)
+
+
+### Features
+
+* added services and queued actors ([6d13a67](https://github.com/doeixd/events/commit/6d13a672d14fd4ca2edab7a0e2fcef76e180cde0))
+* align with updated remix-events ([ae05486](https://github.com/doeixd/events/commit/ae054866ed4c21d03287c4649f78bc5fda311398))
+
 ### [0.0.21](https://github.com/doeixd/events/compare/v0.0.20...v0.0.21) (2025-10-17)
 
 ### [0.0.20](https://github.com/doeixd/events/compare/v0.0.19...v0.0.20) (2025-10-17)
