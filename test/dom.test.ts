@@ -7,7 +7,8 @@ import {
   on,
   onIntersect,
   onResize,
-  trapFocus
+  trapFocus,
+  events
 } from '../src/index';
 
 describe('DOM Module', () => {
@@ -75,16 +76,27 @@ describe('DOM Module', () => {
       const button = document.createElement('button');
       document.body.appendChild(button);
 
-      const clickHandler = dom.click(button);
       let clicked = false;
 
-      clickHandler(() => {
+      const clickDescriptor = dom.click(() => {
         clicked = true;
       });
+
+      // Test that it returns the correct descriptor
+      expect(clickDescriptor).toEqual({
+        type: 'click',
+        handler: expect.any(Function),
+        options: undefined
+      });
+
+      // Test that the handler works when attached
+      const container = events(button);
+      container.on([clickDescriptor]);
 
       button.click();
       expect(clicked).toBe(true);
 
+      container.cleanup();
       document.body.removeChild(button);
     });
 
@@ -92,12 +104,22 @@ describe('DOM Module', () => {
       const input = document.createElement('input');
       document.body.appendChild(input);
 
-      const inputHandler = dom.input(input);
       let inputValue = '';
 
-      inputHandler((event) => {
+      const inputDescriptor = dom.input((event) => {
         inputValue = (event.target as HTMLInputElement).value;
       });
+
+      // Test that it returns the correct descriptor
+      expect(inputDescriptor).toEqual({
+        type: 'input',
+        handler: expect.any(Function),
+        options: undefined
+      });
+
+      // Test that the handler works when attached
+      const container = events(input);
+      container.on([inputDescriptor]);
 
       input.value = 'test';
       input.dispatchEvent(new Event('input'));
@@ -498,26 +520,44 @@ describe('DOM Module', () => {
       document.body.removeChild(button);
     });
 
-    it('should maintain existing dom shortcuts', () => {
+    it('should provide dom shortcuts as EventDescriptor factories', () => {
       const button = document.createElement('button');
       document.body.appendChild(button);
 
-      // All existing shortcuts should work
-      expect(typeof dom.click(button)).toBe('function');
-      expect(typeof dom.input(button as any)).toBe('function');
-      expect(typeof dom.change(button as any)).toBe('function');
-      expect(typeof dom.submit(button as any)).toBe('function');
-      expect(typeof dom.keydown(button)).toBe('function');
-      expect(typeof dom.keyup(button)).toBe('function');
-      expect(typeof dom.focus(button)).toBe('function');
-      expect(typeof dom.blur(button)).toBe('function');
-      expect(typeof dom.mousemove(button)).toBe('function');
-      expect(typeof dom.mousedown(button)).toBe('function');
-      expect(typeof dom.mouseup(button)).toBe('function');
-      expect(typeof dom.wheel(button)).toBe('function');
-      expect(typeof dom.touchstart(button)).toBe('function');
-      expect(typeof dom.touchend(button)).toBe('function');
-      expect(typeof dom.touchmove(button)).toBe('function');
+      // All dom shortcuts should return EventDescriptor objects when given a handler
+      const clickDescriptor = dom.click(() => {});
+      expect(clickDescriptor).toEqual({
+        type: 'click',
+        handler: expect.any(Function),
+        options: undefined
+      });
+
+      const inputDescriptor = dom.input(() => {});
+      expect(inputDescriptor).toEqual({
+        type: 'input',
+        handler: expect.any(Function),
+        options: undefined
+      });
+
+      const changeDescriptor = dom.change(() => {});
+      expect(changeDescriptor).toEqual({
+        type: 'change',
+        handler: expect.any(Function),
+        options: undefined
+      });
+      const wheelDescriptor = dom.wheel(() => {});
+      expect(wheelDescriptor).toEqual({
+        type: 'wheel',
+        handler: expect.any(Function),
+        options: undefined
+      });
+
+      const touchstartDescriptor = dom.touchstart(() => {});
+      expect(touchstartDescriptor).toEqual({
+        type: 'touchstart',
+        handler: expect.any(Function),
+        options: undefined
+      });
 
       document.body.removeChild(button);
     });

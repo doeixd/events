@@ -10,7 +10,7 @@ import { createSubscriptionStack} from './stack';
  * This is the internal representation of an actor's capabilities.
  * @hidden
  */
-type BehaviorMap = Record<string, (state: any, ...payload: any[]) => any>;
+type BehaviorMap = Record<string, (...args: any[]) => any>;
 
 /**
  * A generic interface representing any object with a `subscribe` method,
@@ -38,8 +38,11 @@ type MethodsFromBehavior<
 > = {
   // Maps each key (method name) from the behavior map...
   [K in keyof TBehavior]: (
-    //...to a function whose parameters are inferred from the user's handler, skipping the initial `state` argument.
-    ...args: Parameters<TBehavior[K]> extends [any, ...infer P] ? P : []
+    //...to a function whose parameters are inferred from the user's handler.
+    // In queued mode, skip the initial `state` argument. In direct mode, use all parameters.
+    ...args: TMode extends 'queued'
+      ? Parameters<TBehavior[K]> extends [any, ...infer P] ? P : []
+      : Parameters<TBehavior[K]>
   ) => // The return type depends on the mode and the handler's own return type.
   TMode extends 'queued'
     ? ReturnType<TBehavior[K]> extends TState | void // Is the handler a state update or fire-and-forget?
@@ -171,7 +174,7 @@ export function createActor<
   initialContext: TContext,
   setup: (context: TContext) => TEmitters,
   options?: Omit<ActorOptions<TContext>, 'mode'>
-): Actor<TContext, Record<keyof TEmitters, () => void>, 'direct'>;
+): Actor<TContext, TEmitters, 'direct'>;
 
 /**
  * Main `createActor` implementation.

@@ -124,32 +124,45 @@ buttonEvents.on([
 ]);
 ```
 
-### `createInteraction`: Encapsulating Complexity
+### Interaction Functions: Encapsulating Complexity
 
-This is the ultimate tool for encapsulation. `createInteraction` lets you compose multiple low-level event sources (`mousedown`, `keydown`, `touchstart`) into a single, high-level, semantic event (`press`). It lets you build your own "event components."
+The ultimate tool for encapsulation. Interaction functions let you compose multiple low-level event sources (`mousedown`, `keydown`, `touchstart`) into a single, high-level, semantic event (`press`). They let you build your own "event components."
 
 ```typescript
-import { createInteraction, dom } from '@doeixd/events';
+import type { EventDescriptor, InteractionHandle } from '@doeixd/events';
+import { dom } from '@doeixd/events';
 
 // Create a reusable 'longPress' interaction
-const longPress = createInteraction<Element, { duration: number }>(
-  'longpress',
-  ({ target, dispatch }) => {
-    let timer;
-    const onMouseDown = dom.mousedown(target);
-    const onMouseUp = dom.mouseup(window);
+function longPress(this: InteractionHandle<CustomEvent<{ duration: number }>>): EventDescriptor[] {
+  let timer: number | null = null;
 
-    const downSub = onMouseDown(e => {
+  return [
+    dom.mousedown((e, signal) => {
       const start = Date.now();
-      timer = setTimeout(() => {
-        dispatch({ detail: { duration: Date.now() - start } });
+      timer = window.setTimeout(() => {
+        this.dispatchEvent(new CustomEvent('longpress', {
+          detail: { duration: Date.now() - start },
+          bubbles: true,
+          cancelable: true,
+        }));
       }, 500);
-    });
 
-    const upSub = onMouseUp(() => clearTimeout(timer));
-    return [downSub, upSub]; // Return cleanup functions
-  }
-);
+      // Clean up timer if aborted
+      signal.addEventListener('abort', () => {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      });
+    }),
+    dom.mouseup(() => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    })
+  ];
+}
 
 // Use it declaratively!
 events(button, [ longPress(e => console.log(`Long press: ${e.detail.duration}ms`)) ]);

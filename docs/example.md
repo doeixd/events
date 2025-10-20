@@ -498,7 +498,7 @@ Clicking a small trash icon can be difficult on mobile. A "swipe left" gesture i
 
 A manual implementation would require adding `touchstart`, `touchmove`, and `touchend` listeners, tracking coordinates, calculating deltas, and managing state to see if a swipe threshold was met. This is a lot of complex, imperative code inside the `Note` component.
 
-#### After: Using `createInteraction` to Build a Reusable Gesture
+#### After: Using Interaction Functions to Build a Reusable Gesture
 
 We can build a high-level, semantic `swipeLeft` interaction once and then use it declaratively anywhere in our app.
 
@@ -507,47 +507,43 @@ We can build a high-level, semantic `swipeLeft` interaction once and then use it
 ```typescript
 // src/interactions.ts
 
-import { createInteraction, dom, createSubscriptionStack } from "@doeixd/events";
+import type { EventDescriptor, InteractionHandle } from "@doeixd/events";
+import { dom } from "@doeixd/events";
 
 // Create a high-level 'swipeleft' interaction from low-level touch events.
-export const swipeLeft = createInteraction<Element, { distance: number }>(
-  'swipeleft',
-  ({ target, dispatch }) => {
-    let startX = 0;
-    let isSwiping = false;
-    const SWIPE_THRESHOLD = -50; // Must move at least 50px to the left
+export function swipeLeft(this: InteractionHandle<CustomEvent<{ distance: number }>>): EventDescriptor[] {
+  let startX = 0;
+  let isSwiping = false;
+  const SWIPE_THRESHOLD = -50; // Must move at least 50px to the left
 
-    // Use a subscription stack for robust cleanup. [cite: src/stack.ts]
-    const stack = createSubscriptionStack();
-
-    stack.defer(dom.touchstart(target)(e => {
+  return [
+    dom.touchstart((e, signal) => {
       startX = e.touches[0].clientX;
-    }));
-
-    stack.defer(dom.touchmove(target)(e => {
+    }),
+    dom.touchmove((e, signal) => {
       const deltaX = e.touches[0].clientX - startX;
       // We only care about swipes that are moving left.
       if (deltaX < SWIPE_THRESHOLD) {
         isSwiping = true;
         // Optionally, you could apply a transform style here for visual feedback.
       }
-    }));
-
-    stack.defer(dom.touchend(target)(e => {
+    }),
+    dom.touchend((e, signal) => {
       if (isSwiping) {
         const finalDeltaX = e.changedTouches[0].clientX - startX;
         // Dispatch our new, high-level event!
-        dispatch({ detail: { distance: Math.abs(finalDeltaX) } });
+        this.dispatchEvent(new CustomEvent('swipeleft', {
+          detail: { distance: Math.abs(finalDeltaX) },
+          bubbles: true,
+          cancelable: true,
+        }));
       }
       // Reset for the next gesture.
       startX = 0;
       isSwiping = false;
-    }));
-
-    // The factory returns a single cleanup function.
-    return () => stack.dispose();
-  }
-);
+    })
+  ];
+}
 ```
 
 **Step 2: Use the new interaction in the `Note` component**

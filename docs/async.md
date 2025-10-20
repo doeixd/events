@@ -7,9 +7,8 @@ In a synchronous world, code is simple: A happens, then B happens. But modern us
 We will cover:
 1.  **The Flow of Control:** How events propagate through synchronous and asynchronous chains.
 2.  **Cancellation:** The automatic, life-saving mechanism for preventing async race conditions.
-3.  **Halting vs. `preventDefault`:** The crucial difference between stopping a data pipeline and a UI behavior.
-4.  **Disposal:** The modern, error-proof system for preventing memory leaks.
-5.  **Scheduling & Batching:** How microtasks are leveraged to optimize state updates and prevent UI glitches.
+3.  **Disposal:** The modern, error-proof system for preventing memory leaks.
+4.  **Scheduling & Batching:** How microtasks are leveraged to optimize state updates and prevent UI glitches.
 
 <br />
 
@@ -143,57 +142,9 @@ emitSearch('solid'); // Aborts Signal A, cancelling Fetch A. Starts Fetch B with
 
 <br />
 
-### 3. Flow Control: `halt()` vs. `preventDefault()`
 
-Both `halt()` and `preventDefault()` stop things, but they operate at different layers of the system and for different reasons. Understanding this distinction is key to building composable logic.
 
-| Feature | `halt()` | `event.preventDefault()` |
-| :--- | :--- | :--- |
-| **Domain** | `@doeixd/events` (Functional Core) | DOM API (Declarative Layer) |
-| **Scope** | Stops a **single `Handler` data-flow chain**. | Stops the **middleware chain** in the `events()` attacher. |
-| **Effect** | Other independent subscribers to the same source **are NOT affected**. | Other subscribers in the `events()` array for that event **ARE affected** (skipped). |
-| **Analogy** | A quality control check on a single assembly line fails; that one product is discarded, but other lines keep running. | The main power switch for the entire assembly floor is flipped; all lines stop for this cycle. |
-
-**When to use `halt()`:**
-Use it inside a functional `Handler` chain to filter data. It's a data-flow tool.
-
-```typescript
-const [onNumber, emitNumber] = createEvent<number>();
-
-// Chain A: Processes only positive numbers
-const onPositive = onNumber(n => n > 0 ? n : halt());
-onPositive(n => console.log('Positive chain:', n));
-
-// Chain B: Processes ALL numbers, unaffected by Chain A's halt
-onNumber(n => console.log('Logger chain:', n));
-
-emitNumber(10);  // Both chains log
-emitNumber(-5); // Only "Logger chain" logs. `halt` stopped Chain A internally.
-```
-
-**When to use `event.preventDefault()`:**
-Use it inside the `events()` attacher to prevent default browser actions *and* stop subsequent handlers in the array from running. It's a UI behavior composition tool.
-
-```typescript
-events(linkElement, [
-  // Handler 1: Consumer's validation logic
-  dom.click(e => {
-    if (shouldStayOnPage()) {
-      e.preventDefault(); // Prevents both browser navigation AND Handler 2
-    }
-  }),
-
-  // Handler 2: Component's default navigation logic
-  dom.click(e => {
-    // This code will only run if Handler 1 did NOT call preventDefault.
-    navigateTo('/new-page');
-  })
-]);
-```
-
-<br />
-
-### 4. Disposal: Winning the War on Memory Leaks
+### 3. Disposal: Winning the War on Memory Leaks
 
 Forgetting to unsubscribe is the most common cause of memory leaks in event-driven applications. `@doeixd/events` provides a modern, robust, and error-proof system for resource management.
 
@@ -235,7 +186,7 @@ class DataWidget {
 
 <br />
 
-### 5. Scheduling & Batching: From Immediate to Optimized
+### 4. Scheduling & Batching: From Immediate to Optimized
 
 The final piece of the puzzle is controlling *when* state notifications fire. Synchronous, immediate updates are simple but can lead to performance issues and UI glitches ("tearing"), where one part of the UI updates before another in the same operation.
 

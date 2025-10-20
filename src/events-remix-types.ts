@@ -6,8 +6,6 @@
  * composable, high-level `Interaction`s.
  */
 
-import type { InteractionFactory } from './interaction';
-
 /**
  * A function that is called to clean up an event listener or other resources.
  * Typically returned from a subscription.
@@ -29,41 +27,53 @@ export type EventWithTargets<
 
 /**
  * The signature for an event handler function within the Remix-style system.
- * It receives the typed event object and an `AbortSignal` for re-entry management,
- * ensuring that an async handler is cancelled if the same event is fired again
- * before the handler completes.
+ * It receives the event object and an `AbortSignal` for cancellation.
  */
-export type EventHandler<
-  E = Event,
-  ECurrentTarget = any,
-  ETarget = any
-> = (event: EventWithTargets<E, ECurrentTarget, ETarget>, signal: AbortSignal) => any | Promise<any>;
+export type EventHandler<E extends Event = Event> = (event: E, signal: AbortSignal) => any | Promise<any>;
 
 /**
  * A declarative description of an event listener to be attached to a target.
  * This serves as the primary data structure for the `events()` attacher function.
  */
-export interface EventDescriptor<ECurrentTarget = any> {
+export interface EventDescriptor {
   /** The name of the event (e.g., 'click', 'keydown', or a custom event name). */
   type: string;
   /** The function to execute when the event is triggered. */
-  handler: EventHandler<any, ECurrentTarget>;
-  /** A flag indicating whether this is a standard DOM event or a custom interaction. */
-  isCustom?: boolean;
+  handler: EventHandler;
   /** Standard `addEventListener` options. */
   options?: AddEventListenerOptions;
 }
 
 /**
- * A specialized `EventDescriptor` for a high-level, custom interaction.
- * It includes the `factory` function that implements the interaction's logic.
+ * The `this` context provided to an interaction function, giving it the tools
+ * it needs to dispatch custom events and respond to abort signals.
  */
-export interface InteractionDescriptor<Target extends EventTarget = any> extends EventDescriptor<Target> {
-  isCustom: true;
-  /** The factory function that sets up the low-level listeners for this interaction. */
-  factory: InteractionFactory<Target>;
-  /** The options object passed to the factory function during setup. */
-  factoryOptions?: any;
+export type InteractionHandle<E extends Event> = {
+  dispatchEvent: (event: E) => void;
+  signal: AbortSignal;
+};
+
+/**
+ * An interaction is a function that returns an array of `EventDescriptor` bindings.
+ * It receives an `InteractionHandle` as the first parameter, providing access to
+ * `dispatchEvent` and `signal` for managing the interaction's lifecycle.
+ */
+export type Interaction<E extends Event> = (
+  handle: InteractionHandle<E>,
+  ...args: any[]
+) => EventDescriptor[];
+
+/**
+ * A descriptor for a high-level interaction that combines the interaction logic
+ * with the user's event handler. This makes interactions truly component-like.
+ */
+export interface InteractionDescriptor<E extends Event = Event> {
+  /** The interaction function that defines the low-level event bindings. */
+  interaction: Interaction<E>;
+  /** The user's handler for the high-level custom event. */
+  handler: EventHandler<E>;
+  /** The type of the custom event this interaction dispatches. */
+  type: string;
 }
 
 /**
@@ -74,9 +84,9 @@ export interface EventContainer {
   /**
    * Attaches or updates the event listeners on the target.
    * This will clean up any previously attached listeners and apply the new set.
-   * @param descriptors A single `EventDescriptor` or an array of them.
+   * @param descriptors A single descriptor, interaction, or an array of them.
    */
-  on: (descriptors: EventDescriptor | EventDescriptor[] | undefined) => void;
+   on: (descriptors: (EventDescriptor | Interaction<any> | InteractionDescriptor<any>)[] | EventDescriptor | Interaction<any> | InteractionDescriptor<any> | undefined) => void;
   /**
    * Removes all event listeners managed by this container.
    */

@@ -107,7 +107,7 @@ describe('createActor', () => {
         handler((data) => { if (typeof data === 'symbol' || data === 'dummy') return; context.count++; });
         return { increment: emit };
       },
-      effectMock
+      { effects: effectMock }
     );
 
     actor.increment();
@@ -129,7 +129,7 @@ describe('createActor', () => {
         handler((data) => { if (typeof data === 'symbol' || data === 'dummy') return; context.count++; });
         return { increment: emit };
       },
-      effectMock
+      { effects: effectMock }
     );
 
     actor.increment();

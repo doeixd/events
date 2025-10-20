@@ -12,8 +12,7 @@
 import type {
   EventDescriptor,
   EventHandler,
-  EventWithTargets,
-  InteractionDescriptor
+  EventWithTargets
 } from './events-remix-types';
 /**
  * Remix Bridge Module
@@ -42,26 +41,8 @@ import { dom } from './dom';
 /*                           Interaction Factory Bridge                        */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Convert a Handler<T> into an InteractionDescriptor factory.
- */
-export /**
- * Converts a Handler into a Remix InteractionDescriptor factory.
- * Useful for advanced custom interactions in Remix events().
- * @param handler The handler to convert
- * @returns A factory function for creating interactions
- */
-function bridgeInteractionFactory<T>(
-  handler: Handler<T>
-): InteractionDescriptor['factory'] {
-  return ({ dispatch }) => {
-    const unsub = handler((value) => {
-      // @ts-ignore
-      dispatch({ detail: value });
-    });
-    return unsub;
-  };
-}
+// Note: bridgeInteractionFactory has been removed in the new architecture
+// Interactions are now simple functions that return EventDescriptor[]
 
 /* -------------------------------------------------------------------------- */
 /*                           DOM Integration Helpers                           */

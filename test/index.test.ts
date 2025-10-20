@@ -26,7 +26,8 @@ import {
   combineLatest,
   fromEmitterEvent,
   subjectFromEvent,
-  on
+  on,
+  events
 } from '../src/index';
 
 describe('@doeixd/events', () => {
@@ -382,8 +383,12 @@ describe('@doeixd/events', () => {
     });
 
     it('should provide shortcuts', () => {
-      const clickHandler = dom.click(mockElement);
-      expect(typeof clickHandler).toBe('function');
+      const clickDescriptor = dom.click(() => {});
+      expect(clickDescriptor).toEqual({
+        type: 'click',
+        handler: expect.any(Function),
+        options: undefined
+      });
     });
 
     it('should create reactive DOM properties', () => {
@@ -1173,16 +1178,19 @@ describe('DOM Utilities', () => {
     const button = document.createElement('button');
     document.body.appendChild(button);
 
-    const clickHandler = dom.click(button);
     let clicked = false;
 
-    clickHandler(() => {
+    const clickDescriptor = dom.click(() => {
       clicked = true;
     });
+
+    const container = events(button);
+    container.on([clickDescriptor]);
 
     button.click();
     expect(clicked).toBe(true);
 
+    container.cleanup();
     document.body.removeChild(button);
   });
 

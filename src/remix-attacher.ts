@@ -2,58 +2,32 @@
  * @module remix-attacher
  *
  * The declarative event attachment system inspired by Remix Events.
- * Provides the central `events()` function that manages event lifecycles,
- * custom interactions, and a `preventDefault` middleware chain.
+ * Provides the central `events()` function that manages event lifecycles
+ * and direct event listener attachment.
  */
 
 import type {
   EventDescriptor,
+  Interaction,
+  InteractionHandle,
   InteractionDescriptor,
   EventContainer,
-  Cleanup,
 } from './events-remix-types';
 
-// Type guard to distinguish custom interactions from standard event descriptors.
-function isInteractionDescriptor(
-  descriptor: EventDescriptor
-): descriptor is InteractionDescriptor {
-  return descriptor.isCustom === true;
+// Type guards to distinguish between different descriptor types.
+function isInteraction(descriptor: any): descriptor is Interaction<any> {
+  return typeof descriptor === 'function' && !descriptor.type;
 }
 
-// Splits a list of descriptors into two arrays: one for custom interactions, one for standard events.
-function splitDescriptors<T extends EventTarget>(
-  descriptors: EventDescriptor<T>[]
-): { custom: InteractionDescriptor<T>[]; standard: EventDescriptor<T>[] } {
-  const custom: InteractionDescriptor<T>[] = [];
-  const standard: EventDescriptor<T>[] = [];
-  for (const d of descriptors) {
-    if (isInteractionDescriptor(d)) {
-      custom.push(d);
-    } else {
-      standard.push(d);
-    }
-  }
-  return { custom, standard };
-}
-
-// Creates a dispatcher function that interactions use to emit their high-level custom events.
-function createDispatcher<T extends EventTarget>(target: T, type: string) {
-  return (options?: CustomEventInit) => {
-    const customEvent = new CustomEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      ...options,
-    });
-    target.dispatchEvent(customEvent);
-  };
+function isInteractionDescriptor(descriptor: any): descriptor is InteractionDescriptor<any> {
+  return typeof descriptor === 'object' && descriptor.interaction && descriptor.handler && descriptor.type;
 }
 
 /**
  * Attaches event listeners declaratively to a target and returns a cleanup function,
  * or creates a container for dynamic event management.
- * This system supports high-level interactions and a middleware-like composition
- * model where handlers can call `event.preventDefault()` to stop subsequent handlers
- * for the same event.
+ * This system supports high-level interactions and direct event listener attachment
+ * where `stopImmediatePropagation()` works as expected by the browser.
  *
  * @param target The `EventTarget` (e.g., an element, window, or document).
  * @returns An `EventContainer` object with `.on()` and `.cleanup()` methods.
@@ -63,90 +37,93 @@ function createDispatcher<T extends EventTarget>(target: T, type: string) {
  * const buttonEvents = events(buttonElement);
  *
  * buttonEvents.on([
- *   dom.click(validate), // This can call preventDefault()
- *   press(submit),       // This will only run if validate() did not prevent default
+ *   dom.click(validate),
+ *   press(submit),
  * ]);
  *
  * // ...later
  * buttonEvents.cleanup();
  */
 export function events<Target extends EventTarget>(target: Target): EventContainer {
-  let cleanups: Cleanup[] = [];
+  let controller: AbortController | null = null;
 
   const cleanupAll = () => {
-    cleanups.forEach(c => c());
-    cleanups = [];
+    if (controller) {
+      controller.abort();
+      controller = null;
+    }
   };
 
-   const on = (nextDescriptors: EventDescriptor | EventDescriptor[] | undefined) => {
-     cleanupAll();
-     const descriptors = nextDescriptors ? (Array.isArray(nextDescriptors) ? nextDescriptors : [nextDescriptors]) : [];
+  const on = (nextDescriptors: (EventDescriptor | Interaction<any> | InteractionDescriptor<any>)[] | EventDescriptor | Interaction<any> | InteractionDescriptor<any> | undefined) => {
+    cleanupAll();
+    controller = new AbortController();
+    const signal = controller.signal;
 
-     if (descriptors.length === 0) return;
+    const descriptors = nextDescriptors ? (Array.isArray(nextDescriptors) ? nextDescriptors : [nextDescriptors]) : [];
 
-     const { custom, standard } = splitDescriptors(descriptors);
+    if (descriptors.length === 0) return;
 
-     // 1. Create dispatches for custom interactions
-     const dispatches = new Map<string, (options?: CustomEventInit) => void>();
-     for (const descriptor of custom) {
-       if (!dispatches.has(descriptor.type)) {
-         dispatches.set(descriptor.type, createDispatcher(target, descriptor.type));
-       }
-     }
+    // Process each descriptor
+    for (const descriptor of descriptors) {
+      if (isInteractionDescriptor(descriptor)) {
+        // This is an interaction descriptor - handle the high-level interaction
+        const handle: InteractionHandle<any> = {
+          dispatchEvent: (event: any) => target.dispatchEvent(event),
+          signal,
+        };
 
-     // 2. Group all handlers by event type to implement the middleware chain.
-     const handlersByType = new Map<string, EventDescriptor<Target>[]>();
-     for (const descriptor of [...standard, ...custom]) {
-       if (!handlersByType.has(descriptor.type)) {
-         handlersByType.set(descriptor.type, []);
-       }
-       handlersByType.get(descriptor.type)!.push(descriptor);
-     }
+        // Call the interaction logic to get the low-level event bindings
+        const interactionDescriptors = descriptor.interaction(handle as any);
 
-     // 3. Attach a single "master" listener per event type.
-     for (const [eventType, eventDescriptors] of handlersByType.entries()) {
-       // This controller is for reentry management on a per-handler basis.
-       const reEntryControllers = new WeakMap<EventDescriptor, AbortController>();
+        // Attach each low-level descriptor returned by the interaction
+        for (const desc of interactionDescriptors) {
+          const listener = (event: Event) => {
+            desc.handler(event as any, signal);
+          };
+          target.addEventListener(desc.type, listener, {
+            ...desc.options,
+            signal,
+          });
+        }
 
-       const masterHandler = (event: Event) => {
-         for (const descriptor of eventDescriptors) {
-           if (event.defaultPrevented) {
-             break; // A previous handler in the chain called preventDefault(), so we stop.
-           }
+        // Separately attach the user's handler for the high-level custom event
+        const highLevelListener = (event: Event) => {
+          descriptor.handler(event as any, signal);
+        };
+        target.addEventListener(descriptor.type, highLevelListener, {
+          signal,
+        });
+      } else if (isInteraction(descriptor)) {
+        // This is a legacy interaction function - call it with the handle context
+        const handle: InteractionHandle<any> = {
+          dispatchEvent: (event: any) => target.dispatchEvent(event),
+          signal,
+        };
 
-           // Re-entry management: abort the previous async call from this specific handler, if any.
-           reEntryControllers.get(descriptor)?.abort();
-           const controller = new AbortController();
-           reEntryControllers.set(descriptor, controller);
+        const interactionDescriptors = descriptor(handle);
 
-           // Execute the user's handler
-           try {
-             descriptor.handler(event as any, controller.signal);
-           } catch (err) {
-             console.error('Handler error:', err);
-           }
-         }
-       };
-
-       target.addEventListener(eventType, masterHandler);
-       cleanups.push(() => target.removeEventListener(eventType, masterHandler));
-     }
-
-     // 4. Prepare and run the factories for all custom interactions.
-     // The factories attach the underlying low-level listeners.
-     const preparedInteractionTypes = new Set<string>();
-     for (const descriptor of custom) {
-       if (preparedInteractionTypes.has(descriptor.type)) continue;
-
-       const dispatch = dispatches.get(descriptor.type)!;
-       const factoryCleanups = descriptor.factory({ target, dispatch }, descriptor.factoryOptions);
-
-       if (factoryCleanups) {
-         cleanups.push(...(Array.isArray(factoryCleanups) ? factoryCleanups : [factoryCleanups]));
-       }
-       preparedInteractionTypes.add(descriptor.type);
-     }
-   };
+        // Attach each descriptor returned by the interaction
+        for (const desc of interactionDescriptors) {
+          const listener = (event: Event) => {
+            desc.handler(event as any, signal);
+          };
+          target.addEventListener(desc.type, listener, {
+            ...desc.options,
+            signal,
+          });
+        }
+      } else {
+        // This is a standard event descriptor - attach it directly
+        const listener = (event: Event) => {
+          descriptor.handler(event as any, signal);
+        };
+        target.addEventListener(descriptor.type, listener, {
+          ...descriptor.options,
+          signal,
+        });
+      }
+    }
+  };
 
   const cleanup = () => {
     cleanupAll();

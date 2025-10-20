@@ -21,7 +21,7 @@ Each primitive in `@doeixd/events` is a different part of our kitchen's workflow
 | Station | Primitive | Core Job | In the Kitchen... |
 | :--- | :--- | :--- | :--- |
 | **Prep Station** | `createOperator` | **Transform a Stream** | The chef with the knives and strainers, preparing a single ingredient for the next step. |
-| **Assembly Line** | `createInteraction` | **Synthesize a Behavior**| The skilled sous-chef who combines multiple prepared ingredients to create a new, complex component of the dish. |
+| **Assembly Line** | `Interaction Functions` | **Synthesize a Behavior**| The skilled sous-chef who combines multiple prepared ingredients to create a new, complex component of the dish. |
 | **Recipe Book** | `createReducer` | **Manage Structured State**| The formal, immutable recipe that guarantees a consistent, auditable result every time. |
 | **Grill Station** | `createActor` | **Encapsulate a "Thing"**| The master chef of a specific station, managing their own tools, inventory, and complex processes. |
 | **Orchestration Station** | `createMachine` | **Coordinate Complex Flows**| The conductor who manages the symphony of state transitions and business logic sequences. |
@@ -119,33 +119,44 @@ Operators give you fine-grained control over the *flow* of a single event stream
 
 While the functional core is for data flow, the declarative layer is for applying logic to the UI and defining user behaviors.
 
-### The Assembly Line: `createInteraction`
+### The Assembly Line: Interaction Functions
 
 > **An interaction is a skilled sous-chef who combines multiple prepared ingredients to create a new, complex component of a dish.**
 
 An interaction's job is to **synthesize** a new, high-level, semantic event from multiple low-level event sources. It takes the raw parts (`mousedown`, `keydown`, `touchstart`) and assembles them into a finished product (a `press` event).
 
-**When to use `createInteraction`:**
+**When to use interaction functions:**
 -   **Defining Semantic User Actions:** To create business-logic events like `press`, `drag`, `swipe`, or `longPress`.
 -   **Normalizing Inputs:** To make a single action work across mouse, keyboard, and touch.
 -   **Building a Design System:** To create a palette of reusable, consistent user behaviors for all your components.
 
 **Example 1: Creating the built-in `press` behavior.**
 ```typescript
-import { createInteraction, events, dom } from '@doeixd/events';
+import type { EventDescriptor, InteractionHandle } from '@doeixd/events';
+import { events, dom } from '@doeixd/events';
 
 // The "recipe" for synthesizing a `press` event from raw inputs
-const press = createInteraction('press', ({ target, dispatch }) => {
-  const onMouseDown = dom.mousedown(target);
-  const onKeyDown = dom.keydown(target);
-  
-  const downSub = onMouseDown(e => dispatch({ detail: { originalEvent: e } }));
-  const keySub = onKeyDown(e => {
-    if (e.key === 'Enter') dispatch({ detail: { originalEvent: e } });
-  });
-
-  return [downSub, keySub];
-});
+function press(this: InteractionHandle<CustomEvent<{ originalEvent: Event }>>): EventDescriptor[] {
+  return [
+    dom.click((e, signal) => {
+      this.dispatchEvent(new CustomEvent('press', {
+        detail: { originalEvent: e },
+        bubbles: true,
+        cancelable: true,
+      }));
+    }),
+    dom.keydown((e, signal) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.dispatchEvent(new CustomEvent('press', {
+          detail: { originalEvent: e },
+          bubbles: true,
+          cancelable: true,
+        }));
+      }
+    })
+  ];
+}
 
 // The "dish" uses the new `press` component declaratively.
 events(button, [
@@ -155,39 +166,161 @@ events(button, [
 **Example 2: Building a `drag` interaction.**
 This interaction tracks mouse movement between `mousedown` and `mouseup` and dispatches the delta.
 ```typescript
-const drag = createInteraction<Element, { dx: number; dy: number }>(
-  'drag',
-  ({ target, dispatch }) => {
-    const onMouseDown = dom.mousedown(target);
-    const onMouseMove = dom.mousemove(window);
-    const onMouseUp = dom.mouseup(window);
+function drag(this: InteractionHandle<CustomEvent<{ dx: number; dy: number }>>): EventDescriptor[] {
+  let lastX = 0;
+  let lastY = 0;
 
-    const downSub = onMouseDown(downEvent => {
+  return [
+    dom.mousedown((downEvent, signal) => {
       downEvent.preventDefault();
-      let lastX = downEvent.clientX;
-      let lastY = downEvent.clientY;
-      
-      const moveSub = onMouseMove(moveEvent => {
-        const dx = moveEvent.clientX - lastX;
-        const dy = moveEvent.clientY - lastY;
-        lastX = moveEvent.clientX;
-        lastY = moveEvent.clientY;
-        dispatch({ detail: { dx, dy } });
-      });
-
-      // The mouseup listener cleans up the mousemove listener
-      const upSub = onMouseUp(() => {
-        moveSub(); // Unsubscribe from mousemove
-        upSub();   // Unsubscribe from this mouseup
-      });
-    });
-
-    return downSub; // The mousedown is the only persistent listener
-  }
-);
+      lastX = downEvent.clientX;
+      lastY = downEvent.clientY;
+    }),
+    dom.mousemove((moveEvent, signal) => {
+      const dx = moveEvent.clientX - lastX;
+      const dy = moveEvent.clientY - lastY;
+      lastX = moveEvent.clientX;
+      lastY = moveEvent.clientY;
+      this.dispatchEvent(new CustomEvent('drag', {
+        detail: { dx, dy },
+        bubbles: true,
+        cancelable: true,
+      }));
+    })
+  ];
+}
 ```
 
 Interactions allow you to elevate your thinking from "a mousedown occurred" to "the user is dragging the element," encapsulating the complex implementation details.
+
+### Creating Custom Event Subclasses for Interactions
+
+While the built-in `press` interaction uses a `PressEvent` class, you can create your own custom `Event` subclasses to provide strongly-typed, semantic events for your interactions. This eliminates the need for "goofy `event.detail`" objects and provides better type safety.
+
+**When to create custom Event subclasses:**
+- When your interaction needs to carry specific data (coordinates, deltas, identifiers)
+- When you want compile-time guarantees about event properties
+- When building a design system with consistent, typed event interfaces
+
+**Example: Creating a `DragEvent` for drag interactions.**
+
+```typescript
+import type { EventDescriptor, InteractionHandle, InteractionDescriptor, EventHandler } from '@doeixd/events';
+import { dom } from '@doeixd/events';
+
+// Define a custom Event subclass
+export class DragEvent extends Event {
+  constructor(
+    public deltaX: number,
+    public deltaY: number,
+    public originalEvent: MouseEvent
+  ) {
+    super('drag', { bubbles: true, cancelable: true });
+  }
+}
+
+// Create the interaction factory
+export function drag(handler: EventHandler<DragEvent>): InteractionDescriptor<DragEvent> {
+  return {
+    interaction: dragInteraction,
+    handler,
+    type: 'drag',
+  };
+}
+
+// The interaction logic
+function dragInteraction(handle: InteractionHandle<DragEvent>): EventDescriptor[] {
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+
+  return [
+    dom.mousedown((e) => {
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      e.preventDefault();
+    }),
+    dom.mousemove((e) => {
+      if (!isDragging) return;
+
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      handle.dispatchEvent(new DragEvent(deltaX, deltaY, e));
+    }),
+    dom.mouseup(() => {
+      isDragging = false;
+    })
+  ];
+}
+
+// Usage with full type safety
+events(draggableElement, [
+  drag((event) => {
+    // event is fully typed: DragEvent with deltaX, deltaY, and originalEvent
+    console.log(`Dragged by ${event.deltaX}, ${event.deltaY}`);
+    element.style.transform = `translate(${event.deltaX}px, ${event.deltaY}px)`;
+  })
+]);
+```
+
+**Example: A `TempoEvent` for timing interactions.**
+
+```typescript
+export class TempoEvent extends Event {
+  constructor(public bpm: number, public beat: number) {
+    super('tempo', { bubbles: true });
+  }
+}
+
+export function tempo(handler: EventHandler<TempoEvent>): InteractionDescriptor<TempoEvent> {
+  return {
+    interaction: tempoInteraction,
+    handler,
+    type: 'tempo',
+  };
+}
+
+function tempoInteraction(handle: InteractionHandle<TempoEvent>): EventDescriptor[] {
+  let intervalId: number;
+  let currentBeat = 0;
+
+  return [
+    dom.click(() => {
+      // Start a metronome at 120 BPM
+      const bpm = 120;
+      const interval = (60 / bpm) * 1000; // ms per beat
+
+      intervalId = window.setInterval(() => {
+        currentBeat++;
+        handle.dispatchEvent(new TempoEvent(bpm, currentBeat));
+      }, interval);
+    }),
+    dom.click(() => {
+      // Stop on second click
+      if (intervalId) {
+        clearInterval(intervalId);
+        currentBeat = 0;
+      }
+    })
+  ];
+}
+
+// Usage
+events(metronomeButton, [
+  tempo((event) => {
+    console.log(`Beat ${event.beat} at ${event.bpm} BPM`);
+    playMetronomeSound();
+  })
+]);
+```
+
+Custom Event subclasses provide:
+- **Type Safety**: Compile-time guarantees about event properties
+- **Semantic Clarity**: Events carry their data directly, not in `detail` objects
+- **IDE Support**: Better autocomplete and refactoring capabilities
+- **Consistency**: Standardized event interfaces across your application
 
 <br />
 
@@ -401,7 +534,7 @@ While both **Actors** and **Interactions** help you build complex, event-driven 
 
 ### The Core Difference
 
-| Aspect | Interactions (`createInteraction`) | Actors (`createActor`) |
+| Aspect | Interactions (Functions) | Actors (`createActor`) |
 | :--- | :--- | :--- |
 | **Purpose** | **Synthesize new events** from multiple low-level sources | **Encapsulate stateful behavior** with methods and internal logic |
 | **Scope** | **Event transformation** - takes events in, emits different events out | **State management** - maintains internal state, exposes methods |
@@ -415,14 +548,26 @@ While both **Actors** and **Interactions** help you build complex, event-driven 
 
 ```typescript
 // A "press" interaction normalizes clicks, taps, and key presses
-const press = createInteraction('press', ({ target, dispatch }) => {
-  const onMouseDown = dom.mousedown(target);
-  const onKeyDown = dom.keydown(target);
-
-  const downSub = onMouseDown(e => dispatch({ detail: { originalEvent: e } }));
-  const keySub = onKeyDown(e => {
-    if (e.key === 'Enter') dispatch({ detail: { originalEvent: e } });
-  });
+function press(this: InteractionHandle<CustomEvent<{ originalEvent: Event }>>): EventDescriptor[] {
+  return [
+    dom.click((e, signal) => {
+      this.dispatchEvent(new CustomEvent('press', {
+        detail: { originalEvent: e },
+        bubbles: true,
+        cancelable: true,
+      }));
+    }),
+    dom.keydown((e, signal) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.dispatchEvent(new CustomEvent('press', {
+          detail: { originalEvent: e },
+          bubbles: true,
+          cancelable: true,
+        }));
+      }
+    })
+  ];
 
   return [downSub, keySub];
 });

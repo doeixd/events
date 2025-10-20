@@ -10,6 +10,7 @@
 
 import { HaltSymbol, Handler, Subject, Unsubscribe, createSubject } from './main';
 import { createSubscriptionStack } from './stack';
+import type { EventHandler } from './events-remix-types';
 
 /* -------------------------------------------------------------------------- */
 /*                                Base Helpers                                */
@@ -78,62 +79,62 @@ export function fromDomEvent<
 /* -------------------------------------------------------------------------- */
 
 /**
- * A collection of pre-built, type-safe shortcuts for creating `Handler` streams
+ * A collection of pre-built, type-safe shortcuts for creating `EventDescriptor` objects
  * from common DOM events on an `Element`.
  *
  * @example
- * const onButtonClick = dom.click(buttonElement);
- * onButtonClick(() => console.log('Button clicked!'));
- *
- * const onTextInput = dom.input(inputElement);
- * onTextInput(event => console.log('Value:', event.target.value));
+ * // Now returns EventDescriptor objects instead of Handler streams
+ * const descriptors = [
+ *   dom.click(() => console.log('Button clicked!')),
+ *   dom.input(event => console.log('Value:', event.target.value))
+ * ];
  */
 export const dom = {
   // Mouse Events
-  click: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'click', options),
-  dblclick: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'dblclick', options),
-  mousedown: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mousedown', options),
-  mouseup: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mouseup', options),
-  mousemove: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mousemove', options),
-  mouseover: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mouseover', options),
-  mouseout: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mouseout', options),
-  mouseenter: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mouseenter', options),
-  mouseleave: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'mouseleave', options),
-  contextmenu: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'contextmenu', options),
+  click: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'click', handler, options }),
+  dblclick: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'dblclick', handler, options }),
+  mousedown: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mousedown', handler, options }),
+  mouseup: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mouseup', handler, options }),
+  mousemove: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mousemove', handler, options }),
+  mouseover: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mouseover', handler, options }),
+  mouseout: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mouseout', handler, options }),
+  mouseenter: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mouseenter', handler, options }),
+  mouseleave: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'mouseleave', handler, options }),
+  contextmenu: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'contextmenu', handler, options }),
 
   // Keyboard Events
-  keydown: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'keydown', options),
-  keyup: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'keyup', options),
-  keypress: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'keypress', options),
+  keydown: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'keydown', handler, options }),
+  keyup: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'keyup', handler, options }),
+  keypress: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'keypress', handler, options }),
 
   // Form & Input Events
-  input: <E extends HTMLElement>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'input', options),
-  change: <E extends HTMLElement>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'change', options),
-  submit: <E extends HTMLFormElement>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'submit', options),
-  reset: <E extends HTMLFormElement>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'reset', options),
+  input: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'input', handler, options }),
+  change: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'change', handler, options }),
+  submit: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'submit', handler, options }),
+  reset: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'reset', handler, options }),
 
   // Focus Events
-  focus: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'focus', options),
-  blur: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'blur', options),
-  focusin: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'focusin', options),
-  focusout: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'focusout', options),
+  focus: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'focus', handler, options }),
+  blur: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'blur', handler, options }),
+  focusin: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'focusin', handler, options }),
+  focusout: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'focusout', handler, options }),
 
   // Touch Events
-  touchstart: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'touchstart', options),
-  touchend: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'touchend', options),
-  touchmove: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'touchmove', options),
-  touchcancel: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'touchcancel', options),
+  touchstart: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'touchstart', handler, options }),
+  touchend: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'touchend', handler, options }),
+  touchmove: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'touchmove', handler, options }),
+  touchcancel: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'touchcancel', handler, options }),
 
   // Pointer Events
-  pointerdown: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'pointerdown', options),
-  pointerup: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'pointerup', options),
-  pointermove: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'pointermove', options),
-  pointerenter: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'pointerenter', options),
-  pointerleave: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'pointerleave', options),
+  pointerdown: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'pointerdown', handler, options }),
+  pointerup: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'pointerup', handler, options }),
+  pointermove: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'pointermove', handler, options }),
+  pointerenter: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'pointerenter', handler, options }),
+  pointerleave: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'pointerleave', handler, options }),
 
   // Scroll & Wheel
-  scroll: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'scroll', options),
-  wheel: <E extends Element>(el: E, options?: AddEventListenerOptions) => fromDomEvent(el, 'wheel', options),
+  scroll: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'scroll', handler, options }),
+  wheel: (handler: EventHandler, options?: AddEventListenerOptions) => ({ type: 'wheel', handler, options }),
 };
 
 

@@ -53,7 +53,6 @@ export * from './dom';
 
 // Remix bridge
 export {
-bridgeInteractionFactory,
 fromDomHandler,
 bindSubjectToDom,
 emitterToEventDescriptor
@@ -108,7 +107,8 @@ export * from './remix-bridge';
 // Re-export types for convenience
 export type {
   EventDescriptor,
-  InteractionDescriptor,
+  Interaction,
+  InteractionHandle,
   EventContainer,
   EventHandler,
   Cleanup
@@ -119,12 +119,6 @@ export type {
  * @see {@link ./remix-attacher.ts}
  */
 export { events } from './remix-attacher';
-
-/**
- * The factory for creating reusable, high-level interactions.
- * @see {@link ./interaction.ts}
- */
-export { createInteraction } from './interaction';
 
 /**
  * A bridge to use functional `@doeixd/events` Handlers within the declarative `events()` system.

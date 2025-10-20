@@ -3,7 +3,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   events,
-  createInteraction,
   press,
   fromHandler,
   dom,
@@ -41,10 +40,10 @@ describe('Remix Events Compatibility Layer', () => {
        const container = events(element);
        const handler = vi.fn();
 
-       container.on({
+       container.on([{
          type: 'click',
          handler
-       });
+       }]);
 
        element.click();
        expect(handler).toHaveBeenCalledTimes(1);
@@ -97,10 +96,10 @@ describe('Remix Events Compatibility Layer', () => {
       expect(newHandler).toHaveBeenCalledTimes(1);
     });
 
-    it('should support preventDefault middleware behavior', () => {
+    it('should support stopImmediatePropagation', () => {
       const container = events(element);
       const firstHandler = vi.fn().mockImplementation((event) => {
-        event.preventDefault();
+        event.stopImmediatePropagation();
       });
       const secondHandler = vi.fn();
 
@@ -112,7 +111,7 @@ describe('Remix Events Compatibility Layer', () => {
       element.click();
 
       expect(firstHandler).toHaveBeenCalledTimes(1);
-      expect(secondHandler).not.toHaveBeenCalled(); // Should be stopped by preventDefault
+      expect(secondHandler).not.toHaveBeenCalled(); // Should be stopped by stopImmediatePropagation
     });
 
     it('should handle empty descriptor arrays', () => {
@@ -136,93 +135,16 @@ describe('Remix Events Compatibility Layer', () => {
     });
   });
 
-  describe('createInteraction() - Custom Interaction Factory', () => {
-    it('should create a reusable interaction function', () => {
-      const longPress = createInteraction<HTMLButtonElement, { duration: number }>(
-        'longpress',
-        ({ dispatch }) => {
-          let timer: number | undefined;
-          const cleanup = () => {
-            if (timer) clearTimeout(timer);
-          };
 
-          element.addEventListener('mousedown', () => {
-            timer = window.setTimeout(() => {
-              dispatch({ detail: { duration: 500 } });
-            }, 500);
-          });
-
-          element.addEventListener('mouseup', cleanup);
-
-          return cleanup;
-        }
-      );
-
-      expect(typeof longPress).toBe('function');
-    });
-
-    it('should return an InteractionDescriptor when called with handler', () => {
-      const simplePress = createInteraction('simplepress', ({ dispatch }) => {
-        element.addEventListener('click', () => dispatch());
-        return () => element.removeEventListener('click', () => dispatch());
-      });
-
-      const descriptor = simplePress(() => {});
-
-      expect(descriptor).toEqual({
-        type: 'simplepress',
-        handler: expect.any(Function),
-        isCustom: true,
-        factory: expect.any(Function),
-        factoryOptions: undefined
-      });
-    });
-
-    it('should pass options to the factory', () => {
-      const configurablePress = createInteraction<HTMLButtonElement, void, { delay: number }>(
-        'configurablepress',
-        ({ dispatch }, options) => {
-          const delay = options?.delay ?? 0;
-          element.addEventListener('click', () => {
-            setTimeout(() => dispatch(), delay);
-          });
-          return () => {};
-        }
-      );
-
-      const descriptor = configurablePress(() => {}, { delay: 100 });
-
-      expect(descriptor.factoryOptions).toEqual({ delay: 100 });
-    });
-
-    it('should handle factory returning multiple cleanups', () => {
-      const multiCleanup = createInteraction('multicleanup', ({ dispatch }) => {
-        const cleanup1 = vi.fn();
-        const cleanup2 = vi.fn();
-
-        element.addEventListener('click', dispatch);
-
-        return [cleanup1, cleanup2];
-      });
-
-      const descriptor = multiCleanup(() => {});
-      const cleanups = descriptor.factory({ dispatch: vi.fn(), target: element });
-
-      expect(Array.isArray(cleanups)).toBe(true);
-      if (Array.isArray(cleanups)) {
-        cleanups.forEach(cleanup => cleanup());
-        expect(cleanups[0]).toHaveBeenCalledTimes(1);
-        expect(cleanups[1]).toHaveBeenCalledTimes(1);
-      }
-    });
-  });
 
   describe('press - Built-in Interaction', () => {
     it('should dispatch press event on mouse click', () => {
       const container = events(element);
       const pressHandler = vi.fn();
 
-      container.on(press(pressHandler));
+      container.on([
+        press(pressHandler) // Attaches the interaction with handler
+      ]);
 
       element.click();
 
@@ -230,7 +152,7 @@ describe('Remix Events Compatibility Layer', () => {
       expect(pressHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'press',
-          detail: { originalEvent: expect.any(MouseEvent) }
+          originalEvent: expect.any(MouseEvent)
         }),
         expect.any(AbortSignal)
       );
@@ -240,7 +162,9 @@ describe('Remix Events Compatibility Layer', () => {
       const container = events(element);
       const pressHandler = vi.fn();
 
-      container.on(press(pressHandler));
+      container.on([
+        press(pressHandler)
+      ]);
 
       element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
@@ -248,7 +172,7 @@ describe('Remix Events Compatibility Layer', () => {
       expect(pressHandler).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'press',
-          detail: { originalEvent: expect.any(KeyboardEvent) }
+          originalEvent: expect.any(KeyboardEvent)
         }),
         expect.any(AbortSignal)
       );
@@ -258,35 +182,51 @@ describe('Remix Events Compatibility Layer', () => {
       const container = events(element);
       const pressHandler = vi.fn();
 
-      container.on(press(pressHandler));
+      container.on([
+        press(pressHandler)
+      ]);
 
       element.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
 
       expect(pressHandler).toHaveBeenCalledTimes(1);
+      expect(pressHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'press',
+          originalEvent: expect.any(KeyboardEvent)
+        }),
+        expect.any(AbortSignal)
+      );
     });
 
     it('should dispatch press event on touch end', () => {
       const container = events(element);
       const pressHandler = vi.fn();
 
-      container.on(press(pressHandler));
+      container.on([
+        press(pressHandler)
+      ]);
 
       element.dispatchEvent(new TouchEvent('touchend'));
 
       expect(pressHandler).toHaveBeenCalledTimes(1);
       expect(pressHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          detail: { originalEvent: expect.any(TouchEvent) }
+          type: 'press',
+          originalEvent: expect.any(TouchEvent)
         }),
         expect.any(AbortSignal)
       );
     });
 
+
+
     it('should prevent default on space key to avoid page scroll', () => {
       const container = events(element);
       const pressHandler = vi.fn();
 
-      container.on(press(pressHandler));
+      container.on([
+        press(pressHandler)
+      ]);
 
       const spaceEvent = new KeyboardEvent('keydown', { key: ' ' });
       const preventDefaultSpy = vi.spyOn(spaceEvent, 'preventDefault');
@@ -353,36 +293,40 @@ describe('Remix Events Compatibility Layer', () => {
       expect(pressHandler).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle complex interaction with state', () => {
-      const doubleClick = createInteraction<HTMLButtonElement, { count: number }>(
-        'doubleclick',
-        ({ dispatch }) => {
-          let clickCount = 0;
-          let timer: number | undefined;
+    it('should handle custom interaction functions', () => {
+      function doubleClick(handle: any): any[] {
+        let clickCount = 0;
+        let timer: number | undefined;
 
-          const handler = () => {
+        return [{
+          type: 'click',
+          handler: () => {
             clickCount++;
             if (clickCount === 1) {
               timer = window.setTimeout(() => {
-                dispatch({ detail: { count: clickCount } });
+                handle.dispatchEvent(new CustomEvent('doubleclick', {
+                  detail: { count: clickCount }
+                }));
                 clickCount = 0;
               }, 300);
             } else if (clickCount === 2) {
               if (timer) clearTimeout(timer);
-              dispatch({ detail: { count: clickCount } });
+              handle.dispatchEvent(new CustomEvent('doubleclick', {
+                detail: { count: clickCount }
+              }));
               clickCount = 0;
             }
-          };
-
-          element.addEventListener('click', handler);
-          return () => element.removeEventListener('click', handler);
-        }
-      );
+          }
+        }];
+      }
 
       const container = events(element);
       const doubleClickHandler = vi.fn();
 
-      container.on(doubleClick(doubleClickHandler));
+      container.on([
+        doubleClick,
+        { type: 'doubleclick', handler: doubleClickHandler }
+      ]);
 
       // Single click - should not trigger immediately
       element.click();
@@ -411,8 +355,10 @@ describe('Remix Events Compatibility Layer', () => {
        const parentHandler = vi.fn();
        const childHandler = vi.fn();
 
-       parentContainer.on({ type: 'click', handler: parentHandler });
-       childContainer.on(press(childHandler));
+        parentContainer.on({ type: 'click', handler: parentHandler });
+         childContainer.on([
+           press(childHandler)
+         ]);
 
        childElement.click();
 
@@ -426,17 +372,16 @@ describe('Remix Events Compatibility Layer', () => {
   });
 
   describe('Error Handling and Edge Cases', () => {
-    it('should handle interaction factory throwing errors', () => {
-      const errorInteraction = createInteraction('error', () => {
-        throw new Error('Factory error');
-      });
+    it('should handle interaction function throwing errors', () => {
+      function errorInteraction(): any[] {
+        throw new Error('Interaction error');
+      }
 
       const container = events(element);
-      const handler = vi.fn();
 
       expect(() => {
-        container.on(errorInteraction(handler));
-      }).toThrow('Factory error');
+        container.on([errorInteraction]);
+      }).toThrow('Interaction error');
     });
 
     it('should handle handler throwing errors gracefully', () => {

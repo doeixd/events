@@ -5,14 +5,23 @@
  * keyboard, and touch into a single, semantic event.
  */
 
-import { createInteraction } from '../interaction';
-import { dom } from '../dom';
-import { createSubscriptionStack } from '../stack';
+import type { EventDescriptor, InteractionHandle, InteractionDescriptor, EventHandler } from '../events-remix-types';
 
 /**
- * A normalized "press" interaction.
+ * A custom event class for press interactions that carries the original event
+ * directly as a property, eliminating the need for event.detail.
+ */
+export class PressEvent extends Event {
+  constructor(public originalEvent: Event) {
+    super('press', { bubbles: true, cancelable: true });
+  }
+}
+
+/**
+ * A normalized "press" interaction factory.
  *
- * Dispatches a `press` custom event when a user activates an element via:
+ * Creates a press interaction that dispatches a `PressEvent` when a user activates
+ * an element via:
  * - Left mouse button click
  * - `Enter` or `Space` key press
  * - Touch tap
@@ -20,47 +29,50 @@ import { createSubscriptionStack } from '../stack';
  * This encapsulates the logic for handling different input methods, simplifying
  * component code.
  *
+ * @param handler The user's callback for the press event
+ * @returns An InteractionDescriptor that can be used with events()
+ *
  * @example
  * events(button, [
  *   press(e => {
- *     console.log(`Pressed with a ${e.detail.originalEvent.type} event.`);
- *     // e.detail.originalEvent is the underlying MouseEvent, KeyboardEvent, etc.
+ *     console.log(`Pressed with a ${e.originalEvent.type} event.`);
+ *     // e.originalEvent is the underlying MouseEvent, KeyboardEvent, etc.
  *   })
  * ]);
  */
-export const press = createInteraction<Element, { originalEvent: Event }>(
-  'press',
-  ({ target, dispatch }) => {
-    // Use the library's own robust subscription manager for cleanup.
-    const stack = createSubscriptionStack();
+export function press(handler: EventHandler<PressEvent>): InteractionDescriptor<PressEvent> {
+  return {
+    interaction: pressInteraction,
+    handler,
+    type: 'press',
+  };
+}
 
-    const onPress = (originalEvent: Event) => {
-      // We check for defaultPrevented on the original event here.
-      // If another handler (e.g., for validation) stopped it, we don't dispatch our custom event.
-      if (originalEvent.defaultPrevented) {
-        return;
+/**
+ * The actual press interaction logic that defines the low-level event bindings.
+ */
+function pressInteraction(handle: InteractionHandle<PressEvent>): EventDescriptor[] {
+  const dispatch = handle.dispatchEvent;
+
+  const onPress = (originalEvent: Event) => {
+    // We check for defaultPrevented on the original event here.
+    // If another handler (e.g., for validation) stopped it, we don't dispatch our custom event.
+    if (originalEvent.defaultPrevented) {
+      return;
+    }
+    dispatch(new PressEvent(originalEvent as MouseEvent | KeyboardEvent | TouchEvent));
+  };
+
+  // The interaction returns its low-level event bindings.
+  return [
+    { type: 'click', handler: onPress },
+    { type: 'keydown', handler: (e) => {
+      const event = e as KeyboardEvent;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault(); // Prevent page scroll on spacebar press.
+        onPress(event);
       }
-      dispatch({ detail: { originalEvent } });
-    };
-
-    // --- Mouse Logic ---
-    stack.defer(dom.click(target)(onPress));
-
-    // --- Keyboard Logic ---
-    stack.defer(
-      dom.keydown(target)(e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault(); // Prevent page scroll on spacebar press.
-          onPress(e);
-        }
-      })
-    );
-
-    // --- Touch Logic ---
-    // Note: We use touchend to better simulate a "tap" action.
-    stack.defer(dom.touchend(target)(onPress));
-
-    // Return a single, robust cleanup function.
-    return () => stack.dispose();
-  }
-);
+    }},
+    { type: 'touchend', handler: onPress },
+  ];
+}
