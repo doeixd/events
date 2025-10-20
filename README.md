@@ -1950,151 +1950,342 @@ RxJS-style operators for event stream transformation. These operators provide po
 
 ## 🎭 Actor System
 
-The actor system provides a higher-level abstraction for managing state and behavior in a reactive, encapsulated way. Actors combine state management with event-driven behavior, similar to the actor model in concurrent programming.
+The actor system provides a powerful abstraction for managing state and behavior in a reactive, encapsulated way. Actors combine state management with event-driven logic, providing a robust solution for both simple UI state and complex concurrent operations.
 
-### `createActor<TContext, TEmitters>(initialContext: TContext, setup: (context: TContext) => TEmitters, effects?: ActorEffect<TContext>): Actor<TContext, TEmitters>`
+The core of the system is the `createActor` primitive, which supports two distinct execution modes to fit your specific needs:
 
-Creates a new actor instance with reactive state and event-driven methods.
+1.  **`'direct'` Mode (Default):** For simple, synchronous state management. It's fast, ergonomic, and perfect for self-contained UI components where state logic is straightforward. This is the original behavior of `createActor`.
+2.  **`'queued'` Mode:** For advanced, concurrent state management. It guarantees that all actions are processed sequentially, one at a time, eliminating race conditions entirely. This mode is essential for handling async operations, managing shared resources, or building resilient services.
+
+### `createActor(initialContext, behavior, options?)`
+
+Creates a new, type-safe actor instance with reactive state and event-driven methods.
 
 **Parameters:**
-- `initialContext: TContext` - Initial state object for the actor
-- `setup: (context: TContext) => TEmitters` - Function that defines the actor's behavior and returns emitter methods
-- `effects?: ActorEffect<TContext>` - Optional side effect handler called after state changes
 
-**Returns:** Actor instance with reactive state access and emitter methods
+*   `initialContext: TContext` - The initial state object for the actor.
+*   `behavior: TBehavior | SetupFn` - Defines the actor's logic. This can be:
+    *   A **behavior map** (object with methods) for the modern API, required for `'queued'` mode.
+    *   A **setup function** for the original, backward-compatible API (implicitly uses `'direct'` mode).
+*   `options?: ActorOptions` - An optional configuration object to specify the `mode` and any `effects`.
+
+**Returns:** A fully typed `Actor` instance with a reactive state accessor, a `subscribe` method, a `dispose` method, and all the methods defined in its behavior.
+
+### `'direct'` Mode: Synchronous State Management
+
+This is the default mode, optimized for simplicity and performance in synchronous contexts. It uses a **mutable** state object that you can modify directly.
+
+**Best for:**
+*   UI component state (forms, toggles, counters).
+*   Scenarios where all state updates are synchronous.
 
 **Example:**
+
 ```typescript
 import { createActor, createEvent } from '@doeixd/events';
 
+// In 'direct' mode, we use the original setup function API.
 const counterActor = createActor(
   { count: 0 },
-  (context) => {
-    const [incrementHandler, increment] = createEvent();
-    incrementHandler((data) => {
-      if (typeof data === 'symbol' || data === 'dummy') return;
-      context.count++;
+  (context) => { // context is a mutable proxy
+    const [onIncrement, increment] = createEvent<number>();
+    onIncrement((by) => {
+      // Direct mutation is the pattern here.
+      context.count += by;
     });
-    const [decrementHandler, decrement] = createEvent();
-    decrementHandler((data) => {
-      if (typeof data === 'symbol' || data === 'dummy') return;
-      context.count--;
+
+    const [onReset, reset] = createEvent();
+    onReset(() => {
+      context.count = 0;
     });
-    return { increment, decrement };
+
+    return { increment, reset };
   }
 );
 
-// Access current state
+// Access current state synchronously
 console.log(counterActor()); // { count: 0 }
 
-// Trigger behavior
-counterActor.increment();
-console.log(counterActor()); // { count: 1 }
+// Trigger behavior - state updates happen immediately
+counterActor.increment(5);
+console.log(counterActor()); // { count: 5 }
 
 // Subscribe to state changes
 counterActor.subscribe((state) => console.log('State changed:', state));
+
+counterActor.reset(); // Logs: "State changed: { count: 0 }"
 ```
 
-### `select<T>(sources: Subscribable<any>[], projection: () => T): Subject<T>`
+### `'queued'` Mode: Concurrent & Async-Safe State Management
 
-Creates a derived reactive value from one or more actor or subject sources.
+This mode provides strong guarantees for concurrent applications. It uses an **immutable** state pattern and processes all actions sequentially from a queue, which **eliminates race conditions**.
 
-**Parameters:**
-- `sources: Subscribable<any>[]` - Array of actors or subjects to derive from
-- `projection: () => T` - Function that computes the derived value from current source states
-
-**Returns:** Read-only reactive subject representing the derived state
+**Best for:**
+*   Managing state that involves API calls or other async operations.
+*   Controlling access to shared resources (e.g., a WebSocket connection).
+*   Any situation where multiple events could try to update state at the same time.
 
 **Example:**
+
+```typescript
+import { createActor } from '@doeixd/events';
+
+// In 'queued' mode, we use the new behavior map API.
+const userProfileActor = createActor(
+  { status: 'idle', user: null, error: null },
+  {
+    // A "cast": updates state, returns Promise<void>
+    fetchUser: async (state, userId: string) => {
+      // Handlers must return a NEW state object (immutable pattern)
+      return { ...state, status: 'loading' };
+    },
+    // Another "cast"
+    _fetchSuccess: (state, user: { name: string }) => {
+      return { ...state, status: 'success', user };
+    },
+    // A "call": returns a value, returns Promise<Reply>
+    getUserName: (state) => {
+      return state.user?.name ?? 'Not loaded';
+    },
+  },
+  { mode: 'queued' } // Explicitly enable the safe, queued mode
+);
+
+// --- Usage ---
+
+async function main() {
+  // Methods in 'queued' mode are async, returning Promises.
+  userProfileActor.fetchUser('123'); // This is non-blocking.
+
+  console.log(userProfileActor().status); // 'loading'
+
+  // Let's simulate the API call completing
+  await new Promise(r => setTimeout(r, 100));
+  const fakeUser = { name: 'Jane Doe' };
+  userProfileActor._fetchSuccess(fakeUser);
+
+  // Get the final state
+  const userName = await userProfileActor.getUserName();
+  console.log(`User: ${userName}`); // "User: Jane Doe"
+  console.log(userProfileActor().status); // 'success'
+}
+
+main();
+```
+
+### `select<T>(sources, projection)`
+
+Creates a derived reactive value from one or more actor or subject sources. The derived state automatically updates whenever any of the source actors change.
+
+**Parameters:**
+*   `sources: Subscribable<any>[]` - Array of actors or subjects to derive from.
+*   `projection: () => T` - A function that computes the derived value from the current states of the sources.
+
+**Returns:** A read-only reactive `Subject` with an added `dispose()` method to clean up all underlying subscriptions.
+
+**Example:**
+
 ```typescript
 import { createActor, select, createEvent } from '@doeixd/events';
 
-const authActor = createActor(
-  { isLoggedIn: false },
-  (context) => {
-    const [loginHandler, login] = createEvent();
-    loginHandler((data) => {
-      if (typeof data === 'symbol' || data === 'dummy') return;
-      context.isLoggedIn = true;
-    });
-    return { login };
-  }
-);
+const authActor = createActor({ isLoggedIn: false }, (ctx) => {
+  const [onLogin, login] = createEvent();
+  onLogin(() => (ctx.isLoggedIn = true));
+  return { login };
+});
 
-const cartActor = createActor(
-  { items: [] as string[] },
-  (context) => {
-    const [addItemHandler, addItem] = createEvent<string>();
-    addItemHandler((item) => {
-      if (typeof item === 'symbol' || item === 'dummy') return;
-      context.items.push(item);
-    });
-    return { addItem };
-  }
-);
+const cartActor = createActor({ items: [] as string[] }, (ctx) => {
+  const [onAddItem, addItem] = createEvent<string>();
+  onAddItem((item) => ctx.items.push(item));
+  return { addItem };
+});
 
-// Derive computed state
+// Derive computed state from multiple actors
 const canCheckout = select(
   [authActor, cartActor],
   () => authActor().isLoggedIn && cartActor().items.length > 0
 );
 
-console.log(canCheckout()); // false
-
-authActor.login();
-cartActor.addItem('item1');
-console.log(canCheckout()); // true
-
-// Subscribe to derived state changes
-canCheckout.subscribe((canCheckout) => {
-  console.log('Can checkout:', canCheckout);
+canCheckout.subscribe((canUserCheckout) => {
+  console.log(`Can checkout: ${canUserCheckout}`);
 });
 
-// Cleanup when done
+console.log(canCheckout()); // false
+
+authActor.login();      // Triggers re-computation
+cartActor.addItem('item1'); // Triggers re-computation
+
+console.log(canCheckout()); // true
+
+// It's important to clean up derived state to prevent memory leaks.
 canCheckout.dispose();
 ```
 
-### `Actor<TContext, TEmitters>`
+### `Actor<TContext, TBehavior, TMode>`
 
-Type representing an actor instance with reactive state and emitter methods.
+The fully-inferred type representing an actor instance.
 
 **Type Parameters:**
-- `TContext` - Shape of the actor's internal state object
-- `TEmitters` - Shape of the emitter methods returned by the setup function
+*   `TContext` - The shape of the actor's internal state object.
+*   `TBehavior` - The shape of the behavior map or emitters.
+*   `TMode` - The execution mode (`'direct'` or `'queued'`).
 
 **Properties:**
-- `(): TContext` - Function to access current state snapshot
-- `subscribe: Subject<TContext>['subscribe']` - Subscribe to state changes
-- `...TEmitters` - Emitter methods defined in setup function
+*   `(): TContext` - Function to access the current state snapshot.
+*   `subscribe(...)` - Subscribes to state changes.
+*   `dispose()` - Shuts down the actor and cleans up resources.
+*   `...methods` - All the methods defined in the actor's behavior, with correctly inferred return types (`void` or `Promise<T>`).
 
 ### `ActorEffect<TContext>`
 
-Type for side effect functions that run after actor state changes.
-
-**Type Parameters:**
-- `TContext` - Shape of the actor's state object
+A type for a side-effect function that runs after an actor's state has changed.
 
 **Signature:** `(newContext: TContext, oldContext: TContext) => void`
 
 **Example:**
+
 ```typescript
 const loggingEffect = (newContext, oldContext) => {
-  console.log('State changed:', { from: oldContext, to: newContext });
+  console.log('State changed from:', oldContext, 'to:', newContext);
 };
 
 const actor = createActor(
   { count: 0 },
   (context) => {
-    const [incrementHandler, increment] = createEvent();
-    incrementHandler((data) => {
-      if (typeof data === 'symbol' || data === 'dummy') return;
-      context.count++;
-    });
+    const [onIncrement, increment] = createEvent();
+    onIncrement(() => context.count++);
     return { increment };
   },
-  loggingEffect
+  { effects: [loggingEffect] } // Pass effects in the options object
 );
 ```
+
+### `createService`: For Long-Running, Shared Logic
+
+While `createActor` is a versatile primitive, many applications need a more structured way to define long-running, shared services—things like an authentication manager, a WebSocket client, or an in-memory cache. For this, the library provides `createService`, a high-level abstraction built on top of `createActor`.
+
+A **Service** is a singleton-like actor that is explicitly initialized. It formalizes the pattern of having an `init` step that can fail, ensuring that you only get an instance of your service if it can start up correctly.
+
+It is **always** built on a `'queued'` mode actor, providing the same powerful guarantees of sequential processing and race condition prevention.
+
+#### Key Features
+
+*   **Formal Initialization:** Services have an `init()` function that can be `async` and can fail gracefully. This is perfect for initial data fetching or setup validation.
+*   **Structured Definition:** Logic is organized into a `ServiceModule`, which clearly separates initialization from the runtime behavior.
+*   **Singleton-like Pattern:** You define the service once with `createService`, which gives you a `start()` method to create and launch an instance when needed.
+
+#### `createService(module)`
+
+Creates a service factory from a `ServiceModule` definition.
+
+**Parameters:**
+
+*   `module: ServiceModule` - An object containing the service's `init` logic and its `behavior` map.
+
+**Returns:** An object with a `start(...args)` method. Calling `start` will initialize and launch a new instance of the service, returning a `Promise` that resolves with the running service actor.
+
+### Example: An In-Memory Cache Service
+
+This example demonstrates how to build a simple, time-aware cache that is safe from concurrent read/write issues.
+
+```typescript
+import { createService, ServiceModule } from '@doeixd/events';
+
+// 1. Define the State and Behavior types for clarity
+type CacheState = {
+  data: Map<string, { value: any; expiresAt: number }>;
+};
+
+type CacheBehavior = {
+  set(state: CacheState, key: string, value: any, ttlMs: number): CacheState;
+  get(state: CacheState, key: string): any | undefined;
+  prune(state: CacheState): CacheState;
+};
+
+// 2. Implement the ServiceModule
+const CacheServiceModule: ServiceModule<CacheState, [], CacheBehavior> = {
+  // `init` is called by `start()`. It can be async.
+  init() {
+    console.log('Cache service initializing...');
+    return { ok: true, state: { data: new Map() } };
+  },
+
+  // The `behavior` map is identical to the one used in `createActor`.
+  behavior: {
+    // A "cast": returns a new state object.
+    set(state, key, value, ttlMs) {
+      const newData = new Map(state.data);
+      newData.set(key, { value, expiresAt: Date.now() + ttlMs });
+      return { data: newData };
+    },
+
+    // A "call": returns a non-state value.
+    get(state, key) {
+      const entry = state.data.get(key);
+      if (entry && Date.now() < entry.expiresAt) {
+        return entry.value;
+      }
+      return undefined; // Entry is missing or expired.
+    },
+    
+    // A "cast": updates state by removing expired items.
+    prune(state) {
+        const now = Date.now();
+        const newData = new Map(state.data);
+        for (const [key, entry] of newData.entries()) {
+            if (now > entry.expiresAt) {
+                newData.delete(key);
+            }
+        }
+        return { data: newData };
+    }
+  },
+};
+
+// 3. Create the service factory from the module definition
+const CacheService = createService(CacheServiceModule);
+
+// 4. In your application's startup logic, start the service
+async function main() {
+  const startResult = await CacheService.start();
+
+  if (!startResult.ok) {
+    console.error('Failed to start cache service:', startResult.reason);
+    return;
+  }
+
+  const cache = startResult.service;
+
+  // Now interact with the running service via its direct, async methods.
+  await cache.set('user:1', { name: 'Alice' }, 5000);
+  
+  const user = await cache.get('user:1');
+  console.log('Fetched user:', user); // Fetched user: { name: 'Alice' }
+
+  // Because a service is just an actor, you can subscribe to its state.
+  cache.subscribe(newState => {
+    console.log(`Cache size is now ${newState.data.size}`);
+  });
+
+  await cache.set('user:2', { name: 'Bob' }, 10000); // Logs: "Cache size is now 2"
+
+  // Clean up when the application shuts down.
+  cache.dispose();
+}
+
+main();
+```
+
+### Actor vs. Service: When to Use Which
+
+While they are built on the same foundation, they are optimized for different use cases.
+
+| Use Case | Recommended Primitive | Why? |
+| :--- | :--- | :--- |
+| **UI Component State** | `createActor` (direct mode) | Simple, synchronous, and co-located with the component. Fast and lightweight. |
+| **Complex Async Logic** | `createActor` (queued mode) | Encapsulates async flows and prevents race conditions without the formality of a service. |
+| **Shared Application Logic** | `createService` | Provides a clear initialization path (`init`) and a singleton-like pattern for cross-cutting concerns like auth or data caching. |
+| **Managing External Resources** | `createService` | `init` is perfect for establishing connections (e.g., WebSocket, IndexedDB), and the queued actor ensures safe, ordered interaction. |
 
 <br />
 
